@@ -17,3 +17,10 @@ resume_rewriter/
 ├── .env.example             # Template configuration
 └── requirements.txt         # Dependencies
 ```
+
+## Setup DB
+
+```sh
+createdb resume_rewriter_db -U postgres
+psql -U postgres -d resume_rewriter_db -f db/schema.sql
+```
