@@ -22,6 +22,7 @@ The **Agentic Resume Rewriter** addresses this by orchestrating a feedback loop 
 resume_rewriter/
 ├── config/
 │   ├── __init__.py
+│   ├── action_verbs.py          #  
 │   └── settings.py              # Pydantic Settings loading configurations from .env
 ├── db/
 │   ├── __init__.py
@@ -31,8 +32,7 @@ resume_rewriter/
 ├── parsers/
 │   ├── __init__.py
 │   ├── base.py                  # Abstract Base Class for document parsing (BaseDocumentParser)
-│   ├── resume_parser.py         # Multi-format parser for PDF, Markdown, and TXT resumes
-│   └── verb_parser.py           # Specialized PDF parser extracting action verbs into memory
+│   └── resume_parser.py         # Multi-format parser for PDF, Markdown, and TXT resumes
 ├── scrapers/
 │   ├── __init__.py
 │   └── jd_scraper.py            # Crawl4AI + BeautifulSoup async scraper for dynamic job boards
