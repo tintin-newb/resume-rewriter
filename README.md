@@ -191,7 +191,6 @@ MIN_MATCH_SCORE=8.0
 MAX_LOOPS=3
 
 # Default File Paths
-DEFAULT_ACTION_VERBS_PATH=data/action_verbs.pdf
 OUTPUT_DIR=output/
 ```
 
@@ -202,7 +201,6 @@ OUTPUT_DIR=output/
 | `POSTGRES_*` | Connection credentials for the application database. |
 | `MIN_MATCH_SCORE` | Score (1.0 to 10.0) that satisfies the loop and triggers the referral agent. |
 | `MAX_LOOPS` | Circuit breaker limit preventing infinite optimizer iterations. |
-| `DEFAULT_ACTION_VERBS_PATH`| Path to the PDF listing power action verbs. |
 | `OUTPUT_DIR` | Directory where optimized Markdown resumes are saved. |
 
 ---

@@ -17,7 +17,6 @@ class Settings(BaseSettings):
     # Pipeline Settings
     MIN_MATCH_SCORE: float = 8.0
     MAX_LOOPS: int = 3
-    DEFAULT_ACTION_VERBS_PATH: Path = Path("data/action_verbs.pdf")
     OUTPUT_DIR: Path = Path("output")
 
     model_config = SettingsConfigDict(
