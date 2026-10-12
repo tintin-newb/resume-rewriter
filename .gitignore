@@ -4,3 +4,4 @@
 data/ollama_storage/
 data/qdrant_data/
 .env
+**/ollama_storage/
