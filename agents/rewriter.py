@@ -9,24 +9,28 @@ from agents.state import AgentState
 
 
 class RewriterResult(BaseModel):
-    rewritten_resume_markdown: str = Field(..., description="Rewritten resume in clean Markdown.")
-    modifications_made: List[str] = Field(..., description="Changes applied.")
-    categories_leveraged: List[str] = Field(..., description="Action verb categories utilized.")
+    rewritten_resume_markdown: str = Field(
+        ..., 
+        description="The complete, finalized rewritten resume in clean, professional Markdown."
+    )
+    modifications_made: List[str] = Field(..., description="Key changes made to improve alignment.")
+    action_verbs_applied: List[str] = Field(..., description="Action verbs integrated from the catalog.")
 
 
 REWRITER_PROMPT = ChatPromptTemplate.from_messages([
     ("system", """You are an Executive Resume Strategist.
 Rewrite the candidate's resume to address the Recruiter audit feedback and align with the JD.
 
-CRITICAL INSTRUCTIONS FOR ACTION VERBS:
-1. You are provided with ACTION VERBS CLASSIFIED BY FUNCTIONAL CATEGORY.
-2. CONTEXT-MATCH VERBS TO BULLETS:
-   - For leadership, ownership, or team coordination bullets: use [LEADERSHIP & MANAGEMENT].
-   - For architecture, coding, and systems: use [TECHNICAL & ENGINEERING].
-   - For measurable outcomes and results: use [ACCOMPLISHMENTS & HIGH IMPACT].
-   - For data analysis, metrics, and investigation: use [RESEARCH & INVESTIGATION].
-   - For cross-functional collaboration: use [COMMUNICATION & COLLABORATION].
-3. ZERO HALLUCINATION: Rephrase and elevate existing experience, but NEVER invent new roles, tools, metrics, or technologies."""),
+CRITICAL RULES:
+1. ZERO HALLUCINATION: Rephrase and elevate existing experience, but NEVER invent new roles, tools, metrics, or technologies.
+2. ACTION VERBS: Start every single accomplishment bullet point with an active verb from the provided categorized catalog.
+3. STRICT MARKDOWN FORMATTING:
+   - Output must be publication-grade Markdown.
+   - Use `# Candidate Name` for header, followed by contact details separated by pipes (`|`).
+   - Use `## Section Title` for major sections (e.g., `## Professional Summary`, `## Work Experience`, `## Technical Skills`, `## Education`, `## Projects`).
+   - For job roles, use `### Role Title | Company Name | Location` and a clean date block.
+   - Every accomplishment must use standard markdown dashes (`- `), NEVER raw unicode bullets (`•`, `◦`).
+   - Fix all squished text artifacts (e.g., separate dates and company names with proper spacing)."""),
     ("user", """--- TARGET JOB DESCRIPTION ---
 {job_description}
 
@@ -44,12 +48,11 @@ Suggestions:
 --- CURRENT RESUME ---
 {current_resume}
 
-Rewrite the resume in Markdown, selecting verbs appropriate to each bullet point's functional context.""")
+Rewrite the complete resume in professional Markdown now.""")
 ])
 
 
 def rewriter_node(state: AgentState) -> Dict[str, Any]:
-    """Rewrites the resume using in-memory categorized action verbs."""
     llm = ChatOllama(
         model=settings.OLLAMA_MODEL,
         base_url=settings.OLLAMA_BASE_URL,
