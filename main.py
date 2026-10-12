@@ -189,10 +189,54 @@ def run_cli(
         "status": "PROCESSING"
     }
 
-    # --- 6. Workflow Execution ---
+    # --- 6. Live Streamed Workflow Execution ---
     console.print("\n[bold magenta]Compiling & executing LangGraph agent pipeline...[/bold magenta]\n")
     workflow = build_workflow()
-    final_state: AgentState = workflow.invoke(initial_state)
+
+    final_state = dict(initial_state)
+
+    # Stream real-time node outputs instead of blocking silently
+    for event in workflow.stream(initial_state):
+        for node_name, node_output in event.items():
+            final_state.update(node_output)
+
+            if node_name == "recruiter":
+                score = node_output.get("match_score", 0.0)
+                is_pass = score >= target_min_score
+                score_badge = f"[bold green]{score}/10.0[/bold green]" if is_pass else f"[bold yellow]{score}/10.0[/bold yellow]"
+                qualified_badge = "[green]Yes[/green]" if node_output.get("is_qualified") else "[red]No[/red]"
+
+                strengths_text = "\n".join(f"  [green]✓[/green] {s}" for s in node_output.get("strengths", [])[:3]) or "  None identified"
+                gaps_text = "\n".join(f"  [red]✗[/red] {g}" for g in node_output.get("gaps", [])[:3]) or "  None identified"
+                suggestions_text = "\n".join(f"  [yellow]→[/yellow] {s}" for s in node_output.get("suggestions", [])[:3]) or "  None provided"
+
+                console.print(Panel(
+                    f"[bold]Match Score:[/bold] {score_badge} (Target: >= {target_min_score})\n"
+                    f"[bold]Meets Core Qualifications:[/bold] {qualified_badge}\n\n"
+                    f"[bold]Recruiter Audit Summary:[/bold]\n{node_output.get('recruiter_verdict', '')}\n\n"
+                    f"[bold green]Top Matching Strengths:[/bold green]\n{strengths_text}\n\n"
+                    f"[bold red]Critical Gaps Detected:[/bold red]\n{gaps_text}\n\n"
+                    f"[bold yellow]Directives for Re-writer:[/bold yellow]\n{suggestions_text}",
+                    title=f"[bold magenta]Node: Recruiter Audit (Round {final_state['iteration']})[/bold magenta]",
+                    border_style="magenta"
+                ))
+
+            elif node_name == "rewriter":
+                mods = node_output.get("modifications_made", [])
+                mods_text = "\n".join(f"  • {m}" for m in mods[:4]) if mods else "  • Re-anchored accomplishments using categorized action verbs."
+
+                console.print(Panel(
+                    f"[bold cyan]Action words integrated & accomplishments rewritten:[/bold cyan]\n{mods_text}\n\n"
+                    f"[dim]Updated resume drafted. Handing off to Recruiter for re-evaluation (Round {final_state['iteration']})...[/dim]",
+                    title="[bold cyan]Node: Re-writer Optimization Pass[/bold cyan]",
+                    border_style="cyan"
+                ))
+
+            elif node_name == "referral":
+                console.print("[bold green]✓ Node: Referral Generator drafted cold outreach message.[/bold green]")
+
+            elif node_name == "save_artifacts":
+                console.print(f"[bold dim]✓ Node: Exported optimized resume to: {node_output.get('saved_file_path')}[/bold dim]\n")
 
     # --- 7. PostgreSQL Persistence ---
     try:
