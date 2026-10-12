@@ -5,12 +5,10 @@ from typing import Optional
 import click
 from rich.console import Console
 from rich.panel import Panel
-from rich.table import Table
 
 from config.settings import settings
 from bootstrap import SystemBootstrap
 from parsers.resume_parser import ResumeParser
-from parsers.verb_parser import ActionVerbPDFParser
 from scrapers.jd_scraper import JDScraper
 from db.operations import get_existing_application, save_application_state
 from agents.workflow import build_workflow
@@ -24,7 +22,7 @@ console = Console()
     "--resume", "-r",
     required=True,
     type=click.Path(exists=True, path_type=Path),
-    help="Path to base candidate resume (.pdf, .md, or .txt)."
+    help="Path to base candidate resume (.pdf, .md, .txt, or .docx)."
 )
 @click.option(
     "--company", "-c",
@@ -75,12 +73,6 @@ console = Console()
     help=f"Maximum rewriter iterations (default: {settings.MAX_LOOPS})."
 )
 @click.option(
-    "--verbs-pdf",
-    type=click.Path(path_type=Path),
-    default=None,
-    help="Path to the action verbs reference PDF."
-)
-@click.option(
     "--skip-bootstrap",
     is_flag=True,
     default=False,
@@ -96,7 +88,6 @@ def run_cli(
     force: bool,
     min_score: Optional[float],
     max_loops: Optional[int],
-    verbs_pdf: Optional[Path],
     skip_bootstrap: bool
 ):
     """
@@ -110,7 +101,7 @@ def run_cli(
         border_style="cyan"
     ))
 
-    # --- 1. System Bootstrap Pre-Flight Checks ---
+    # --- 1. Pre-Flight Health Checks ---
     if not skip_bootstrap:
         bootstrap = SystemBootstrap()
         if not bootstrap.run_checks():
@@ -128,7 +119,7 @@ def run_cli(
             f"[bold]Last Score:[/bold] {existing['match_score']}/10.0\n"
             f"[bold]Status:[/bold] {existing['status']}\n"
             f"[bold]Saved Resume:[/bold] {existing['rewritten_resume_path']}\n\n"
-            f"[dim]Run again with [bold cyan]--force[/bold cyan] to re-run the agent loop.[/dim]",
+            f"[dim]Run with [bold cyan]--force[/bold cyan] to overwrite this record.[/dim]",
             title="[bold yellow]Cached Run Found[/bold yellow]",
             border_style="yellow"
         ))
@@ -162,7 +153,7 @@ def run_cli(
         console.print(f"[cyan]Reading job description from:[/cyan] {jd_file}")
         job_description = jd_file.read_text(encoding="utf-8").strip()
 
-    # --- 4. Resume & Action Verbs Ingestion ---
+    # --- 4. Resume Ingestion ---
     console.print(f"[cyan]Parsing base resume:[/cyan] {resume}")
     resume_parser = ResumeParser()
     try:
@@ -170,17 +161,6 @@ def run_cli(
     except Exception as e:
         console.print(f"[bold red]Failed to parse resume:[/bold red] {str(e)}")
         sys.exit(1)
-
-    verbs_target = verbs_pdf or settings.DEFAULT_ACTION_VERBS_PATH
-    action_verbs = []
-    if Path(verbs_target).is_file():
-        console.print(f"[cyan]Parsing action verbs from:[/cyan] {verbs_target}")
-        verb_parser = ActionVerbPDFParser()
-        parsed_verbs = verb_parser.parse(verbs_target)
-        action_verbs = parsed_verbs.get("verb_set", [])
-        console.print(f"[green]Loaded {len(action_verbs)} action verbs into agent vocabulary.[/green]")
-    else:
-        console.print(f"[yellow]Action verbs PDF not found at {verbs_target}. Falling back to default vocabulary.[/yellow]")
 
     # --- 5. State Initialization ---
     target_min_score = min_score if min_score is not None else settings.MIN_MATCH_SCORE
@@ -194,7 +174,6 @@ def run_cli(
         "job_description": job_description,
         "base_resume": base_resume_text,
         "current_resume": base_resume_text,
-        "action_verbs": action_verbs,
         "iteration": 1,
         "max_loops": target_max_loops,
         "min_match_score": target_min_score,
@@ -215,7 +194,7 @@ def run_cli(
     workflow = build_workflow()
     final_state: AgentState = workflow.invoke(initial_state)
 
-    # --- 7. Persistence to PostgreSQL ---
+    # --- 7. PostgreSQL Persistence ---
     try:
         save_application_state(final_state)
         console.print("[green]Successfully persisted run artifacts to PostgreSQL.[/green]\n")
@@ -242,7 +221,7 @@ def run_cli(
             border_style="cyan"
         ))
     else:
-        console.print("[yellow]Referral message was not generated because match score threshold was not achieved.[/yellow]")
+        console.print("[yellow]Referral message was not generated because the match score threshold was not reached.[/yellow]")
 
 
 if __name__ == "__main__":

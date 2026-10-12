@@ -10,10 +10,9 @@ class AgentState(TypedDict):
     job_url: Optional[str]
     job_description: str
 
-    # Resumes & Reference Data
+    # Resumes
     base_resume: str
     current_resume: str
-    action_verbs: List[str]
 
     # Loop Controls
     iteration: int
@@ -36,4 +35,4 @@ class AgentState(TypedDict):
 
     # Artifacts & DB State
     saved_file_path: Optional[str]
-    status: str  # "MATCHED", "MAX_LOOPS_EXCEEDED", "FAILED"
+    status: str
