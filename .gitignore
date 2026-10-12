@@ -1,7 +1,7 @@
 **/env_*
 **/__pycache*
 **/.agent*
-data/ollama_storage/
-data/qdrant_data/
+data/
+output/
 .env
 **/ollama_storage/

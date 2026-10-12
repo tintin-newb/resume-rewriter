@@ -221,18 +221,23 @@ If any system is unreachable or uninitialized, the diagnostic table will highlig
 #### Command Line Options
 ```text
 Options:
-  -r, --resume PATH       Path to base candidate resume (.pdf, .md, .txt) [required]
-  -c, --company TEXT      Name of the hiring company [required]
-  -j, --job-id TEXT       Unique requisition ID or code [required]
-  --role TEXT             Target job title [required]
-  -u, --url TEXT          Public URL to job posting (scraped via Crawl4AI)
-  --jd-file PATH          Local path to a text/markdown file containing the JD
-  -f, --force             Force re-execution even if already cached in DB
-  --min-score FLOAT       Target score threshold to exit loop (default: 8.0)
-  --max-loops INTEGER     Maximum optimizer iterations (default: 3)
-  --verbs-pdf PATH        Path to custom action verbs reference PDF
-  --skip-bootstrap        Skip pre-flight system checks
-  --help                  Show this help message and exit.
+  -r, --resume PATH    Path to base candidate resume (.pdf, .md, .txt, or
+                       .docx).  [required]
+  -c, --company TEXT   Name of the hiring company (e.g., 'Stripe').
+                       [required]
+  -j, --job-id TEXT    Unique requisition ID or code (e.g., 'ENG-4021').
+                       [required]
+  --role TEXT          Target job title (e.g., 'Senior Backend Engineer').
+                       [required]
+  -u, --url TEXT       Public URL to the job posting (scraped via Crawl4AI).
+  --jd-file PATH       Local path to a text/markdown file containing the JD.
+  -f, --force          Force re-execution even if the job posting was already
+                       processed in the database.
+  --min-score FLOAT    Minimum target score to exit loop (default: 8.0).
+  --max-loops INTEGER  Maximum rewriter iterations (default: 3).
+  --skip-bootstrap     Skip pre-flight health checks for Ollama and
+                       PostgreSQL.
+  --help               Show this message and exit.
 ```
 
 ---
