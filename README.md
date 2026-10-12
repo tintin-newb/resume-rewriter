@@ -71,21 +71,6 @@ resume_rewriter/
 
 ### 3.1. Database Setup (PostgreSQL)
 
-You can run PostgreSQL either natively on your machine or via Docker.
-
-#### Option A: Docker (Recommended)
-```bash
-# Run a PostgreSQL 16 container
-docker run -d \
-  --name resume_postgres \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=postgres \
-  -e POSTGRES_DB=resume_rewriter_db \
-  -p 5432:5432 \
-  postgres:16-alpine
-```
-
-#### Option B: Native PostgreSQL Service
 1. Install PostgreSQL through your OS package manager (`brew install postgresql` on macOS, `apt install postgresql` on Ubuntu).
 2. Start the service:
    ```bash
