@@ -1,11 +1,11 @@
 # bootstrap.py
 import sys
-import psycopg
 import ollama
 from rich.console import Console
 from rich.table import Table
 
 from config.settings import settings
+from db.connection import test_connection
 
 console = Console()
 
@@ -16,23 +16,7 @@ class SystemBootstrap:
 
     def check_postgres(self) -> tuple[bool, str]:
         """Validates Postgres connectivity and table existence."""
-        try:
-            with psycopg.connect(self.settings.postgres_dsn, connect_timeout=3) as conn:
-                with conn.cursor() as cur:
-                    cur.execute("""
-                        SELECT EXISTS (
-                            SELECT FROM information_schema.tables 
-                            WHERE table_name = 'job_applications'
-                        );
-                    """)
-                    table_exists = cur.fetchone()[0]
-
-            if not table_exists:
-                return False, "Database connected, but 'job_applications' table is missing. Run schema.sql."
-            return True, "Connected (Table 'job_applications' present)"
-
-        except Exception as e:
-            return False, f"PostgreSQL connection failed: {str(e)}"
+        return test_connection()
 
     def check_ollama_and_model(self) -> tuple[bool, str]:
         """Validates Ollama connectivity and model availability."""
