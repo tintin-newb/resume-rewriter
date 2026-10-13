@@ -8,31 +8,44 @@ from agents.state import AgentState
 
 
 class ReferralResult(BaseModel):
-    message: str = Field(..., description="Concise, high-impact cold referral or reachout message (under 120 words).")
-    target_role: str = Field(..., description="Target role name.")
-    impact_highlights: list[str] = Field(..., description="Key qualifications highlighted in the outreach.")
+    message: str = Field(
+        ...,
+        description="A concise, high-impact first-person outreach message written from the candidate to an employee or manager at the target company (under 110 words)."
+    )
+    subject_line: str = Field(
+        ...,
+        description="A punchy email/LinkedIn message subject line."
+    )
 
 
 REFERRAL_PROMPT = ChatPromptTemplate.from_messages([
-    ("system", """You are an Executive Career Coach specializing in high-conversion networking.
-Write a concise, natural, and punchy referral reachout message for LinkedIn or email.
-- Highlight 2 matching core strengths from the candidate's profile.
-- Tone: Professional, confident, respectful of the recipient's time.
-- Length: Under 120 words. No boilerplate filler."""),
+    ("system", """You are an Executive Networking Strategist.
+Write a personalized, concise FIRST-PERSON outreach message from the candidate directly to a prospective colleague, engineering manager, or recruiter at the hiring company.
+
+PERSPECTIVE & VOICE RULES:
+1. STRICT FIRST-PERSON VOICE: Write entirely from the perspective of the candidate ("I", "my background", "I have worked with", "I would welcome the opportunity").
+2. NEVER write in third-person ("they", "their background", "connect you with [Candidate]").
+3. Use placeholder in place of candidate name.
+4. TONE: Confident, peer-to-peer, respectful of the recipient's time.
+5. LENGTH: Under 100 words. Highlight 2 specific technical matches between the candidate's background and the role.
+6. CALL TO ACTION: A light, low-friction request (e.g., asking for a referral or a brief 10-minute chat)."""),
     ("user", """Role: {role} at {company}
-Top Candidate Strengths for this JD:
+Candidate Name: {candidate_name}
+Key Matching Strengths:
 {strengths}
 
-Generate the referral message.""")
+Generate the first-person referral request message now.""")
 ])
 
 
 def referral_node(state: AgentState) -> Dict[str, Any]:
-    """Generates an impactful referral outreach message."""
+    """Generates an impactful first-person outreach message."""
     llm = ChatOllama(
         model=settings.OLLAMA_MODEL,
         base_url=settings.OLLAMA_BASE_URL,
-        temperature=0.3
+        temperature=0.2,
+        num_ctx=4096,
+        num_predict=1024
     ).with_structured_output(ReferralResult)
 
     chain = REFERRAL_PROMPT | llm
@@ -42,6 +55,8 @@ def referral_node(state: AgentState) -> Dict[str, Any]:
         "strengths": "\n".join(f"- {s}" for s in state["strengths"][:3])
     })
 
+    full_message = f"Subject: {res.subject_line}\n\n{res.message}"
+
     return {
-        "referral_message": res.message
+        "referral_message": full_message
     }
