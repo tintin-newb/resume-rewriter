@@ -7,33 +7,27 @@ from config.settings import settings
 from agents.state import AgentState
 
 
+class MatchTier(str, Enum):
+    IRRELEVANT = "Irrelevant"
+    LOW_MATCH = "Low Match"
+    AVERAGE_MATCH = "Average Match"
+    HIGH_MATCH = "High Match"
+    PERFECT_MATCH = "Perfect Match"
+
+
 class RecruiterVerdict(BaseModel):
-    match_score: float = Field(
-        ..., 
-        description="A strict numeric score strictly between 1.0 and 10.0. 10.0 is perfect."
+    match_tier: MatchTier = Field(
+        ...,
+        description="Choose strictly one: 'Irrelevant', 'Low Match', 'Average Match', 'High Match', or 'Perfect Match'."
     )
-    strengths: List[str] = Field(..., description="Verified matching qualifications in resume.")
-    gaps: List[str] = Field(..., description="Missing or weak qualifications compared to JD.")
-    suggestions: List[str] = Field(..., description="Actionable rewording, prioritization, and pruning tips.")
-    is_qualified: bool = Field(..., description="Whether candidate fundamentally qualifies.")
-    summary: str = Field(..., description="Direct 2-3 sentence verdict.")
-
-    @field_validator("match_score", mode="before")
-    @classmethod
-    def normalize_score(cls, v: Any) -> float:
-        """Normalizes 0-100 scales to 1.0-10.0 and clamps bounds."""
-        try:
-            val = float(v)
-        except (ValueError, TypeError):
-            return 5.0
-
-        # Auto-convert percentage scale (e.g., 65.0 -> 6.5)
-        if val > 10.0 and val <= 100.0:
-            val = val / 10.0
-        elif val > 100.0:
-            val = 10.0
-
-        return round(max(1.0, min(10.0, val)), 1)
+    strengths: List[str] = Field(..., description="Genuine matching qualifications present in the resume.")
+    gaps: List[str] = Field(..., description="Crucial missing requirements, missing tools, or domain mismatches.")
+    suggestions: List[str] = Field(..., description="Directives for the Re-writer to address gaps.")
+    is_qualified: bool = Field(
+        ...,
+        description="True ONLY if match_tier is 'High Match' or 'Perfect Match'. Otherwise False."
+    )
+    summary: str = Field(..., description="A blunt, faithful 2-3 sentence verdict explaining the assigned tier.")
 
 
 RECRUITER_PROMPT = ChatPromptTemplate.from_messages([
