@@ -43,7 +43,7 @@ def referral_node(state: AgentState) -> Dict[str, Any]:
     llm = ChatOllama(
         model=settings.OLLAMA_MODEL,
         base_url=settings.OLLAMA_BASE_URL,
-        temperature=0.2,
+        temperature=settings.REFERRAL_TEMP,
         num_ctx=4096,
         num_predict=1024
     ).with_structured_output(ReferralResult)

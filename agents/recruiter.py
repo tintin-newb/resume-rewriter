@@ -59,7 +59,7 @@ def recruiter_node(state: AgentState) -> Dict[str, Any]:
     llm = ChatOllama(
         model=settings.OLLAMA_MODEL,
         base_url=settings.OLLAMA_BASE_URL,
-        temperature=0.0,
+        temperature=settings.RECRUITER_TEMP,
         num_ctx=8192,
         num_predict=4096
     ).with_structured_output(RecruiterVerdict)
