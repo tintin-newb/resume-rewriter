@@ -175,9 +175,8 @@ def run_cli(
         "base_resume": base_resume_text,
         "current_resume": base_resume_text,
         "iteration": 1,
-        "max_loops": target_max_loops,
-        "min_match_score": target_min_score,
-        "match_score": 0.0,
+        "max_loops": max_loops or settings.MAX_LOOPS,
+        "match_tier": "Pending",
         "strengths": [],
         "gaps": [],
         "suggestions": [],
@@ -201,22 +200,17 @@ def run_cli(
             final_state.update(node_output)
 
             if node_name == "recruiter":
-                score = node_output.get("match_score", 0.0)
-                is_pass = score >= target_min_score
-                score_badge = f"[bold green]{score}/10.0[/bold green]" if is_pass else f"[bold yellow]{score}/10.0[/bold yellow]"
-                qualified_badge = "[green]Yes[/green]" if node_output.get("is_qualified") else "[red]No[/red]"
-
-                strengths_text = "\n".join(f"  [green]✓[/green] {s}" for s in node_output.get("strengths", [])[:3]) or "  None identified"
-                gaps_text = "\n".join(f"  [red]✗[/red] {g}" for g in node_output.get("gaps", [])[:3]) or "  None identified"
-                suggestions_text = "\n".join(f"  [yellow]→[/yellow] {s}" for s in node_output.get("suggestions", [])[:3]) or "  None provided"
+                tier = node_output.get("match_tier", "Low Match")
+                is_pass = tier in ["High Match", "Perfect Match"]
+                tier_badge = f"[bold green]{tier}[/bold green]" if is_pass else f"[bold yellow]{tier}[/bold yellow]"
 
                 console.print(Panel(
-                    f"[bold]Match Score:[/bold] {score_badge} (Target: >= {target_min_score})\n"
-                    f"[bold]Meets Core Qualifications:[/bold] {qualified_badge}\n\n"
+                    f"[bold]Match Tier:[/bold] {tier_badge}\n"
+                    f"[bold]Meets Core Qualifications:[/bold] {'[green]Yes[/green]' if node_output.get('is_qualified') else '[red]No[/red]'}\n\n"
                     f"[bold]Recruiter Audit Summary:[/bold]\n{node_output.get('recruiter_verdict', '')}\n\n"
-                    f"[bold green]Top Matching Strengths:[/bold green]\n{strengths_text}\n\n"
-                    f"[bold red]Critical Gaps Detected:[/bold red]\n{gaps_text}\n\n"
-                    f"[bold yellow]Directives for Re-writer:[/bold yellow]\n{suggestions_text}",
+                    f"[bold green]Top Matching Strengths:[/bold green]\n" + "\n".join(f"  ✓ {s}" for s in node_output.get('strengths', [])[:3]) + "\n\n"
+                    f"[bold red]Critical Gaps Detected:[/bold red]\n" + "\n".join(f"  ✗ {g}" for g in node_output.get('gaps', [])[:3]) + "\n\n"
+                    f"[bold yellow]Directives for Re-writer:[/bold yellow]\n" + "\n".join(f"  → {s}" for s in node_output.get('suggestions', [])[:3]),
                     title=f"[bold magenta]Node: Recruiter Audit (Round {final_state['iteration']})[/bold magenta]",
                     border_style="magenta"
                 ))
@@ -246,11 +240,11 @@ def run_cli(
         console.print(f"[red]Database write error:[/red] {str(e)}")
 
     # --- 8. Final Report Display ---
-    score_color = "green" if final_state["match_score"] >= target_min_score else "red"
+    final_tier = final_state.get("match_tier", "Low Match")
+    tier_color = "green" if final_tier in ["High Match", "Perfect Match"] else "yellow"
     console.print(Panel(
         f"[bold]Role:[/bold] {role} at {company}\n"
-        f"[bold]Final Match Score:[/bold] [{score_color}]{final_state['match_score']}/10.0[/{score_color}] "
-        f"(Target: {target_min_score})\n"
+        f"[bold]Final Match Tier:[/bold] [{tier_color}]{final_tier}[/{tier_color}]\n"
         f"[bold]Status:[/bold] {final_state['status']}\n"
         f"[bold]Output File:[/bold] {final_state['saved_file_path']}\n\n"
         f"[bold]Recruiter Verdict:[/bold]\n{final_state['recruiter_verdict']}",

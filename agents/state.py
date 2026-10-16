@@ -17,10 +17,9 @@ class AgentState(TypedDict):
     # Loop Controls
     iteration: int
     max_loops: int
-    min_match_score: float
 
-    # Recruiter Outputs
-    match_score: float
+    # Recruiter Categorical Outputs
+    match_tier: str  # "Irrelevant", "Low Match", "Average Match", "High Match", "Perfect Match"
     strengths: List[str]
     gaps: List[str]
     suggestions: List[str]

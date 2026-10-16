@@ -4,11 +4,10 @@ from db.connection import get_db_connection
 
 
 def get_existing_application(company: str, job_id: str) -> Optional[Dict[str, Any]]:
-    """Checks if a job posting has already been evaluated."""
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT id, company, job_id, role, match_score, status, 
+                SELECT id, company, job_id, role, match_tier, status, 
                        rewritten_resume_path, referral_message
                 FROM job_applications
                 WHERE LOWER(company) = LOWER(%s) AND LOWER(job_id) = LOWER(%s);
@@ -20,17 +19,16 @@ def get_existing_application(company: str, job_id: str) -> Optional[Dict[str, An
 
 
 def save_application_state(state: Dict[str, Any]) -> None:
-    """Inserts or updates the job application state upon pipeline completion."""
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO job_applications (
                     company, job_id, role, job_url, job_description, 
-                    match_score, status, rewritten_resume_path, referral_message, updated_at
+                    match_tier, status, rewritten_resume_path, referral_message, updated_at
                 )
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
                 ON CONFLICT (company, job_id) DO UPDATE SET
-                    match_score = EXCLUDED.match_score,
+                    match_tier = EXCLUDED.match_tier,
                     status = EXCLUDED.status,
                     rewritten_resume_path = EXCLUDED.rewritten_resume_path,
                     referral_message = EXCLUDED.referral_message,
@@ -41,7 +39,7 @@ def save_application_state(state: Dict[str, Any]) -> None:
                 state["role"],
                 state.get("job_url"),
                 state["job_description"],
-                state.get("match_score"),
+                state.get("match_tier"),
                 state.get("status"),
                 state.get("saved_file_path"),
                 state.get("referral_message")
