@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS job_applications (
     role VARCHAR(255) NOT NULL,
     job_url TEXT,
     job_description TEXT NOT NULL,
-    match_score NUMERIC(3, 1),
+    match_tier VARCHAR(64),
     status VARCHAR(64) DEFAULT 'PROCESSING',
     rewritten_resume_path TEXT,
     referral_message TEXT,
