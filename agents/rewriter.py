@@ -48,7 +48,7 @@ Optimize the candidate's EXISTING resume to match the target Job Description (JD
 {job_description}
 
 --- RECRUITER AUDIT FEEDBACK ---
-Score: {match_score}/10.0
+Current Match Tier: {match_tier}
 Gaps:
 {gaps}
 
@@ -77,7 +77,7 @@ def rewriter_node(state: AgentState) -> Dict[str, Any]:
     chain = REWRITER_PROMPT | llm
     result: RewriterResult = chain.invoke({
         "job_description": state["job_description"],
-        "match_score": state["match_score"],
+        "match_tier": state.get("match_tier", "Low Match"),  # <-- String enum
         "gaps": "\n".join(f"- {g}" for g in state["gaps"]),
         "suggestions": "\n".join(f"- {s}" for s in state["suggestions"]),
         "action_verbs_by_category": get_formatted_action_verbs_prompt(),
