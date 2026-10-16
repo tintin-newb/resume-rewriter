@@ -12,10 +12,10 @@ from agents.rewriter import rewriter_node
 from agents.referral import referral_node
 
 console = Console()
-
+PASSING_TIERS = {"High Match", "Perfect Match"}
 
 def save_artifacts_node(state: AgentState) -> Dict[str, Any]:
-    """Saves the final rewritten resume to the output directory."""
+    """Saves the final rewritten resume to disk."""
     settings.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     safe_company = re.sub(r"[^\w\-_\.]", "_", state["company"]).strip()
     safe_job_id = re.sub(r"[^\w\-_\.]", "_", state["job_id"]).strip()
@@ -23,7 +23,7 @@ def save_artifacts_node(state: AgentState) -> Dict[str, Any]:
     file_path = settings.OUTPUT_DIR / f"{safe_company}_{safe_job_id}_resume.md"
     file_path.write_text(state["current_resume"], encoding="utf-8")
 
-    status = "MATCHED" if state["match_score"] >= state["min_match_score"] else "MAX_LOOPS_EXCEEDED"
+    status = "MATCHED" if state.get("match_tier") in PASSING_TIERS else "MAX_LOOPS_EXCEEDED"
     return {
         "saved_file_path": str(file_path.resolve()),
         "status": status
@@ -31,23 +31,22 @@ def save_artifacts_node(state: AgentState) -> Dict[str, Any]:
 
 
 def should_continue(state: AgentState) -> Literal["referral", "save_artifacts", "rewriter"]:
-    """Conditional router based on match score and loop counters."""
-    score = state["match_score"]
-    threshold = state["min_match_score"]
+    """Conditional router based purely on categorical match tier."""
+    tier = state.get("match_tier", "Low Match")
     iteration = state["iteration"]
     max_loops = state["max_loops"]
 
-    console.print(f"[bold magenta]▶ Iteration {iteration}: Recruiter Score = {score}/10.0 (Threshold: {threshold})[/bold magenta]")
+    console.print(f"[bold magenta]▶ Iteration {iteration}: Recruiter Verdict = [yellow]{tier}[/yellow][/bold magenta]")
 
-    if score >= threshold:
-        console.print("[bold green]✓ Score threshold met! Proceeding to Referral Generator...[/bold green]")
+    if tier in PASSING_TIERS:
+        console.print(f"[bold green]✓ Target match achieved ({tier})! Proceeding to Referral Generator...[/bold green]")
         return "referral"
 
     if iteration >= max_loops:
-        console.print(f"[bold yellow]! Max loops ({max_loops}) reached without hitting threshold.[/bold yellow]")
+        console.print(f"[bold yellow]! Max loops ({max_loops}) reached without achieving High Match.[/bold yellow]")
         return "save_artifacts"
 
-    console.print("[cyan]→ Passing suggestions to Re-writer agent...[/cyan]")
+    console.print(f"[cyan]→ Tier is '{tier}'. Passing suggestions to Re-writer agent...[/cyan]")
     return "rewriter"
 
 
