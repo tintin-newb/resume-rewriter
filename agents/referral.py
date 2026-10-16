@@ -10,41 +10,54 @@ from agents.state import AgentState
 class ReferralResult(BaseModel):
     subject_line: str = Field(
         ...,
-        description="A punchy, high-open-rate LinkedIn or email subject line."
+        description="A concise, professional subject line for LinkedIn or email (e.g., 'Referral inquiry: {role} opening - [Your Name]')."
     )
     message: str = Field(
         ...,
-        description="A concise, high-impact first-person outreach message written from the candidate to an employee or manager at the target company (under 110 words)."
+        description="The first-person referral request note written directly from the candidate asking for an internal referral (60 to 90 words)."
     )
 
 
 REFERRAL_PROMPT = ChatPromptTemplate.from_messages([
     (
         "system",
-        """You are an Executive Networking Strategist.
-Write a personalized, concise FIRST-PERSON outreach message from a candidate directly to a prospective colleague, engineering manager, or recruiter at the hiring company.
+        """You are the JOB APPLICANT (The Candidate). 
+You are writing a direct, polite message to an existing employee or engineering lead at {company} on LinkedIn or email, asking them to submit an internal job referral for YOU for the {role} position.
 
-PERSPECTIVE & VOICE RULES:
-1. STRICT FIRST-PERSON VOICE: Write entirely from the perspective of the candidate ("I", "my background", "I have worked with", "I would welcome the opportunity").
-2. NEVER write in third-person ("they", "their background", "connect you with [Candidate]").
-3. Sign off cleanly with '[Your Name]' as the placeholder.
-4. TONE: Confident, peer-to-peer, respectful of the recipient's time.
-5. LENGTH: Under 110 words. Highlight 2 specific technical matches between the candidate's background and the role.
-6. CALL TO ACTION: A light, low-friction request (e.g., asking for a referral or a brief chat)."""
+YOUR IDENTITY & MINDSET:
+- You are NOT a recruiter, career coach, agency scout, or third-party strategist.
+- You are NOT sourcing candidates, and you are NOT asking if they know someone else for the job.
+- YOU are an accomplished software/ML engineer who wants to work at {company}, reaching out to a peer to request an internal referral.
+
+STEP-BY-STEP WRITING GUIDE:
+1. GREETING: Start with "Hi [Name]," (or "Hi [First Name],").
+2. THE HOOK: Mention that you came across the {role} opening at {company} and are very excited about the team's work.
+3. THE FIT (1-2 sentences): Highlight 1 or 2 specific technical accomplishments from your background that make you an immediate fit for this opening.
+4. THE ASK: Directly ask if they would be open to reviewing your resume and submitting an internal referral on your behalf.
+5. CLOSING: Thank them for their time and sign off with:
+   Best regards,
+   [Your Name]
+
+STRICT NEGATIVE RESTRICTIONS:
+- NEVER say "If you know someone fitting this role" or "I am reaching out to connect you with a candidate".
+- NEVER refer to yourself in the third person ("they", "the candidate").
+- Keep the entire body between 60 and 90 words. Avoid fluff, excessive pleasantries, or life stories."""
     ),
     (
         "user",
-        """Role: {role} at {company}
-Key Matching Strengths:
+        """Target Role: {role}
+Target Company: {company}
+
+My Verified Strengths:
 {strengths}
 
-Generate the first-person referral request message now."""
+Write the direct referral request message from me asking the recipient for an internal referral."""
     )
 ])
 
 
 def referral_node(state: AgentState) -> Dict[str, Any]:
-    """Generates an impactful first-person outreach message."""
+    """Generates a high-converting referral request written by the applicant."""
     llm = ChatOllama(
         model=settings.OLLAMA_MODEL,
         base_url=settings.OLLAMA_BASE_URL,
@@ -54,11 +67,10 @@ def referral_node(state: AgentState) -> Dict[str, Any]:
     ).with_structured_output(ReferralResult)
 
     strengths_list = state.get("strengths") or []
-    strengths_text = "\n".join(f"- {s}" for s in strengths_list[:3]) or "- Python, RAG workflows, and distributed systems."
+    strengths_text = "\n".join(f"- {s}" for s in strengths_list[:3]) or "- Python, RAG architectures, and distributed ML pipelines."
 
     chain = REFERRAL_PROMPT | llm
 
-    # Only expects 'role', 'company', and 'strengths'
     res: ReferralResult = chain.invoke({
         "role": state["role"],
         "company": state["company"],
