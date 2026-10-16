@@ -43,8 +43,6 @@ resume_rewriter/
 │   ├── rewriter.py              # Resume optimizer node (action verbs injection)
 │   ├── referral.py              # Referral generator node
 │   └── workflow.py              # LangGraph StateGraph assembly and loop routing logic
-├── data/
-│   └── action_verbs.pdf         # Reference PDF with categorized action verbs
 ├── output/                      # Default destination for generated Markdown resumes
 ├── bootstrap.py                 # System health-check utility for pre-flight assertions
 ├── main.py                      # Click-based CLI entry point
