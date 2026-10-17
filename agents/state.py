@@ -33,5 +33,6 @@ class AgentState(TypedDict):
     referral_message: Optional[str]
 
     # Artifacts & DB State
+    source_resume_path: Optional[str]
     saved_file_path: Optional[str]
     status: str

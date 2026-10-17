@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agentic Resume Rewriter</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <!-- Marked.js for fast, safe markdown document rendering -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+
+  <!-- Top Navigation Header -->
+  <header class="app-header">
+    <div class="brand">
+      <div class="brand-icon">⚡</div>
+      <div>
+        <span class="brand-title">Resume Rewriter</span>
+        <span class="brand-subtitle">AI Agentic Engine</span>
+      </div>
+    </div>
+
+    <!-- Independent Top-Level Tabs -->
+    <nav class="tab-navigation">
+      <button id="nav-tab-generate" class="tab-btn active" onclick="switchTab('generate')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
+        Generate Resume
+      </button>
+      <button id="nav-tab-history" class="tab-btn" onclick="switchTab('history')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+        History
+      </button>
+    </nav>
+
+    <!-- Header Actions: Health Pill & Settings Gear -->
+    <div class="header-actions">
+      <div id="system-health-pill" class="system-status-pill" onclick="openSettingsDrawer()" title="Click to open system settings & connectivity details">
+        <span id="health-dot" class="status-dot"></span>
+        <span id="health-text">Checking...</span>
+      </div>
+
+      <button id="btn-settings-gear" class="icon-btn" onclick="openSettingsDrawer()" title="System Configuration (~/.resume-rewriter/config.env)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main View Container -->
+  <main class="app-container">
+
+    <!-- ==================== TAB 1: GENERATE RESUME ==================== -->
+    <section id="tab-generate" class="tab-content active">
+      <div class="generate-grid">
+        
+        <!-- Left: Input Form Card -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" color="var(--accent-cyan)"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+              Resume & Target Requisition
+            </h2>
+            <p class="card-desc">Provide candidate base resume and job posting details.</p>
+          </div>
+
+          <form id="form-generate" onsubmit="handleGenerateSubmit(event)">
+            
+            <!-- File Upload Dropzone -->
+            <div class="form-group">
+              <label class="form-label">Base Candidate Resume (.pdf, .md, .txt, .docx)</label>
+              <div id="dropzone" class="dropzone" onclick="document.getElementById('file-input-resume').click()">
+                <div class="dropzone-icon">📄</div>
+                <div class="dropzone-text">Click or drag & drop resume file here</div>
+                <div class="dropzone-sub">Saved to ~/.resume-rewriter/uploads/ for version diffing</div>
+                <input type="file" id="file-input-resume" style="display: none;" accept=".pdf,.md,.txt,.docx" onchange="handleFileSelect(event)">
+              </div>
+              <div id="file-pill" class="file-pill">
+                <span id="file-name-display">resume.pdf</span>
+                <span style="cursor: pointer;" onclick="clearSelectedFile(event)">✕</span>
+              </div>
+            </div>
+
+            <!-- Target Company & Job ID -->
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="input-company">Company Name</label>
+                <input type="text" id="input-company" class="form-input" placeholder="e.g. Stripe" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="input-job-id">Job Requisition ID</label>
+                <input type="text" id="input-job-id" class="form-input" placeholder="e.g. ENG-4021" required>
+              </div>
+            </div>
+
+            <!-- Target Role Title -->
+            <div class="form-group">
+              <label class="form-label" for="input-role">Target Role</label>
+              <input type="text" id="input-role" class="form-input" placeholder="e.g. Staff Software Engineer" required>
+            </div>
+
+            <!-- JD Source Mode: URL vs Text -->
+            <div class="form-group">
+              <label class="form-label">Job Description Ingestion Mode</label>
+              <div class="segmented-control">
+                <button type="button" id="btn-mode-url" class="segmented-btn active" onclick="setJDMode('url')">URL Web Scrape</button>
+                <button type="button" id="btn-mode-text" class="segmented-btn" onclick="setJDMode('text')">Direct Text / Paste</button>
+              </div>
+
+              <div id="jd-url-container">
+                <input type="url" id="input-jd-url" class="form-input" placeholder="https://jobs.lever.co/company/...">
+              </div>
+
+              <div id="jd-text-container" style="display: none;">
+                <textarea id="input-jd-text" class="form-textarea" placeholder="Paste full raw text of the job description..."></textarea>
+              </div>
+            </div>
+
+            <!-- Advanced Run Options Accordion -->
+            <div class="accordion-header" onclick="toggleAccordion('advanced-options')">
+              <span>Advanced Run Configuration</span>
+              <span id="accordion-arrow">▼</span>
+            </div>
+            <div id="advanced-options" class="accordion-body">
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label" for="input-min-score">Target Score</label>
+                  <input type="number" id="input-min-score" class="form-input" value="8.0" step="0.5" min="1" max="10">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="input-max-loops">Max Rewriter Passes</label>
+                  <input type="number" id="input-max-loops" class="form-input" value="3" min="1" max="6">
+                </div>
+              </div>
+              <div class="form-group" style="display: flex; gap: 20px; align-items: center; margin-top: 6px;">
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 0.8125rem; color: var(--text-muted); cursor: pointer;">
+                  <input type="checkbox" id="check-force"> Force re-execution if cached
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 0.8125rem; color: var(--text-muted); cursor: pointer;">
+                  <input type="checkbox" id="check-skip-bootstrap"> Skip pre-flight check
+                </label>
+              </div>
+            </div>
+
+            <!-- Action Submit Button -->
+            <button type="submit" id="btn-submit-generate" class="btn-primary">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+              <span>Execute Optimization Pipeline</span>
+            </button>
+          </form>
+        </div>
+
+        <!-- Right: Live Pipeline Stepper Card -->
+        <div class="pipeline-panel">
+          <div class="pipeline-header">
+            <div class="pipeline-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" color="var(--accent-cyan)"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+              Workflow Pipeline Live Monitor
+            </div>
+            <div id="pipeline-status-badge" class="pipeline-status-badge">Idle</div>
+          </div>
+
+          <!-- Empty State (When not running) -->
+          <div id="pipeline-empty-state" style="margin: auto; text-align: center; color: var(--text-subtle); padding: 40px 20px;">
+            <div style="font-size: 3rem; margin-bottom: 12px; opacity: 0.6;">⚡</div>
+            <p style="font-weight: 600; font-size: 1rem; color: var(--text-muted);">Agent Pipeline Ready</p>
+            <p style="font-size: 0.825rem; max-width: 360px; margin: 6px auto 0;">Configure your candidate resume and target job requisition on the left to watch the multi-agent optimization stream live.</p>
+          </div>
+
+          <!-- Active Stepper Container -->
+          <div id="stepper-list" class="stepper-list" style="display: none;"></div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ==================== TAB 2: HISTORY ==================== -->
+    <section id="tab-history" class="tab-content">
+      <div class="history-controls">
+        <div class="search-input-wrap">
+          <input type="text" id="input-history-search" class="form-input" placeholder="Search past runs by company, role, or job ID..." oninput="debounceHistorySearch()">
+        </div>
+        <button class="btn-secondary" onclick="reloadHistory()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+          Refresh Feed
+        </button>
+      </div>
+
+      <!-- History Feed Grid -->
+      <div id="history-grid" class="history-grid"></div>
+
+      <!-- Lazy Loading Sentinel Observer Target -->
+      <div id="history-sentinel">
+        <span id="history-loading-spinner" style="display: none;">Loading older records...</span>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ==================== SETTINGS SLIDE-OVER DRAWER ==================== -->
+  <div id="drawer-settings-backdrop" class="drawer-backdrop" onclick="closeSettingsDrawer(event)">
+    <aside class="slide-drawer" id="drawer-settings" onclick="event.stopPropagation()">
+      <div class="drawer-header">
+        <div>
+          <h3 style="font-size: 1.1rem; font-weight: 700; color: var(--text-main);">System Configuration</h3>
+          <p id="settings-file-badge" style="font-size: 0.75rem; color: var(--accent-cyan); font-family: var(--font-mono); margin-top: 2px;">~/.resume-rewriter/config.env</p>
+        </div>
+        <button class="icon-btn" onclick="closeSettingsDrawer()">✕</button>
+      </div>
+
+      <div class="drawer-body">
+        <p style="font-size: 0.8125rem; color: var(--text-muted); margin-bottom: 20px;">
+          All configuration parameters and system environment variables are stored in your home directory and reloaded across each run.
+        </p>
+
+        <!-- Ollama Section -->
+        <div class="form-group">
+          <label class="form-label" for="cfg-ollama-url">Ollama Base URL</label>
+          <input type="text" id="cfg-ollama-url" class="form-input" placeholder="http://localhost:11434">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="cfg-ollama-model">Ollama Model</label>
+          <input type="text" id="cfg-ollama-model" class="form-input" placeholder="qwen2.5:7b">
+        </div>
+
+        <!-- PostgreSQL Section -->
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="cfg-pg-host">PostgreSQL Host</label>
+            <input type="text" id="cfg-pg-host" class="form-input" placeholder="localhost">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="cfg-pg-port">PostgreSQL Port</label>
+            <input type="number" id="cfg-pg-port" class="form-input" placeholder="5432">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="cfg-pg-db">Database Name</label>
+          <input type="text" id="cfg-pg-db" class="form-input" placeholder="resume_rewriter_db">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="cfg-pg-user">Database User</label>
+            <input type="text" id="cfg-pg-user" class="form-input" placeholder="postgres">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="cfg-pg-pass">Password</label>
+            <input type="password" id="cfg-pg-pass" class="form-input" placeholder="••••••••">
+          </div>
+        </div>
+
+        <!-- Pipeline Tuning Defaults -->
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="cfg-min-score">Default Min Score</label>
+            <input type="number" id="cfg-min-score" class="form-input" value="8.0" step="0.5">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="cfg-max-loops">Default Max Loops</label>
+            <input type="number" id="cfg-max-loops" class="form-input" value="3">
+          </div>
+        </div>
+
+        <!-- Temperatures -->
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="cfg-rewriter-temp">Rewriter Temp</label>
+            <input type="number" id="cfg-rewriter-temp" class="form-input" value="0.2" step="0.1">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="cfg-recruiter-temp">Recruiter Temp</label>
+            <input type="number" id="cfg-recruiter-temp" class="form-input" value="0.0" step="0.1">
+          </div>
+        </div>
+      </div>
+
+      <div class="drawer-footer">
+        <button type="button" class="btn-secondary" onclick="testSystemConnections()">
+          Test Connections
+        </button>
+        <button type="button" class="btn-primary" style="width: auto; margin-top: 0;" onclick="saveSystemConfig()">
+          Save Configuration
+        </button>
+      </div>
+    </aside>
+  </div>
+
+  <!-- ==================== RUN DETAILS MODAL ==================== -->
+  <div id="modal-detail-backdrop" class="modal-backdrop" onclick="closeDetailModal(event)">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <span id="modal-match-tier" class="badge-tier high" style="margin-bottom: 4px;">High Match</span>
+          <h3 id="modal-title" style="font-size: 1.25rem; font-weight: 700;">Role at Company</h3>
+          <p id="modal-meta" style="font-size: 0.75rem; color: var(--text-muted); font-family: var(--font-mono); margin-top: 2px;">Job ID: ENG-4021</p>
+        </div>
+        <button class="icon-btn" onclick="closeDetailModal()">✕</button>
+      </div>
+
+      <div class="modal-body">
+        
+        <!-- Document Preview & Comparison Toggle -->
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+          <div class="segmented-control" style="margin-bottom: 0;">
+            <button id="btn-doc-rewritten" class="segmented-btn active" onclick="switchDocMode('rewritten')">Rewritten Resume</button>
+            <button id="btn-doc-source" class="segmented-btn" onclick="switchDocMode('source')">Original Upload</button>
+            <button id="btn-doc-diff" class="segmented-btn" onclick="switchDocMode('diff')">Side-by-Side Comparison</button>
+          </div>
+          <button id="btn-copy-doc" class="btn-secondary" onclick="copyActiveDocument()">Copy Markdown</button>
+        </div>
+
+        <!-- Rendered Document View -->
+        <div id="doc-viewer-single" class="doc-viewer-container markdown-body">
+          <p style="color: var(--text-subtle);">Loading document content...</p>
+        </div>
+
+        <!-- Side-by-Side Diff View -->
+        <div id="doc-viewer-diff" class="diff-container" style="display: none;">
+          <div class="diff-column">
+            <div class="diff-col-title">Original Resume</div>
+            <div id="diff-original-content" class="markdown-body"></div>
+          </div>
+          <div class="diff-column">
+            <div class="diff-col-title">Rewritten Optimized Resume</div>
+            <div id="diff-rewritten-content" class="markdown-body"></div>
+          </div>
+        </div>
+
+        <!-- Recruiter Verdict Box -->
+        <div style="margin-top: 20px;">
+          <h4 style="font-size: 0.9rem; font-weight: 600; color: var(--accent-cyan); margin-bottom: 8px;">Recruiter Audit Verdict</h4>
+          <div id="modal-recruiter-verdict" class="verdict-box">No verdict recorded.</div>
+        </div>
+
+        <!-- Referral Message Box -->
+        <div id="modal-referral-wrap" style="margin-top: 18px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+            <h4 style="font-size: 0.9rem; font-weight: 600; color: var(--accent-emerald);">Drafted Cold Referral Message</h4>
+            <button class="btn-secondary" style="padding: 4px 10px; font-size: 0.75rem;" onclick="copyReferralMessage()">Copy Message</button>
+          </div>
+          <div id="modal-referral-message" class="verdict-box" style="border-left-color: var(--accent-emerald); font-family: var(--font-mono); font-size: 0.8rem;"></div>
+        </div>
+
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeDetailModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Main Application Script -->
+  <script src="/assets/js/app.js"></script>
+</body>
+</html>

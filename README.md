@@ -298,3 +298,17 @@ Upon completion of a successful run:
    ```
 2. **Referral Message**: If the match threshold was met, a customized reach-out message is printed directly to the terminal for easy copying.
 3. **Database Record**: All execution details (match score, final status, file paths, and referral messages) are updated in the `job_applications` PostgreSQL table.
+
+---
+
+## 6. Interactive Web UI Dashboard
+
+A modern, dark-themed Web UI is available to interactively tailor resumes and review history:
+
+```bash
+python run_ui.py
+```
+Open **[http://localhost:8000](http://localhost:8000)** in your browser:
+* **Generate Resume Tab:** Drag & drop base resume, enter company/job ID/role, toggle JD URL or text, and watch the real-time agent workflow stream live.
+* **History Tab:** Lazy-loaded list of past applications with match tier badges, recruiter audit verdicts, referral messages, and an interactive document viewer (Rewritten, Original, and Side-by-Side Diff).
+* **System Settings Drawer:** Top-right gear icon lets you configure Ollama, PostgreSQL, temperatures, and loop thresholds saved to `~/.resume-rewriter/config.env` and reused across every run.
