@@ -20,7 +20,7 @@ from config.settings import (
 )
 from bootstrap import SystemBootstrap
 from db.operations import get_applications_history, get_application_by_id
-from services.pipeline_runner import create_pipeline_task, active_tasks, sanitize_filename
+from webapp.pipeline_runner import create_pipeline_task, active_tasks, sanitize_filename
 
 app = FastAPI(
     title="Agentic Resume Rewriter Web UI",
@@ -37,8 +37,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Ensure assets directory structure exists
-ASSETS_DIR = Path("assets")
+# Assets directory located inside webapp/assets
+ASSETS_DIR = Path(__file__).resolve().parent / "assets"
 ASSETS_HTML_DIR = ASSETS_DIR / "html"
 ASSETS_CSS_DIR = ASSETS_DIR / "css"
 ASSETS_JS_DIR = ASSETS_DIR / "js"
@@ -291,4 +291,4 @@ async def get_document(doc_type: str, app_id: int):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("webapp.server:app", host="0.0.0.0", port=8000, reload=True)
