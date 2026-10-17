@@ -22,13 +22,13 @@ The **Agentic Resume Rewriter** addresses this by orchestrating a feedback loop 
 resume_rewriter/
 ├── config/
 │   ├── __init__.py
-│   ├── action_verbs.py          #  
-│   └── settings.py              # Pydantic Settings loading configurations from .env
+│   ├── action_verbs.py          # Action verb taxonomy and categorized mappings
+│   └── settings.py              # Dynamic configuration manager (supports ~/.resume-rewriter/config.env)
 ├── db/
 │   ├── __init__.py
 │   ├── schema.sql               # PostgreSQL DDL schema definition
 │   ├── connection.py            # Database client and connection verification
-│   └── operations.py            # Read/write queries, caching, and state persistence
+│   └── operations.py            # Read/write queries, caching, history pagination, and state persistence
 ├── parsers/
 │   ├── __init__.py
 │   ├── base.py                  # Abstract Base Class for document parsing (BaseDocumentParser)
@@ -43,8 +43,17 @@ resume_rewriter/
 │   ├── rewriter.py              # Resume optimizer node (action verbs injection)
 │   ├── referral.py              # Referral generator node
 │   └── workflow.py              # LangGraph StateGraph assembly and loop routing logic
+├── webapp/                      # Web application backend and frontend assets
+│   ├── __init__.py
+│   ├── server.py                # FastAPI REST API and static file server
+│   ├── pipeline_runner.py       # Background worker and Server-Sent Events (SSE) stream manager
+│   └── assets/                  # Frontend single-page app assets
+│       ├── html/index.html      # Responsive Dark Mode dashboard
+│       ├── css/style.css        # Slate/cyan design system and glassmorphism styling
+│       └── js/app.js            # Independent tab logic, SSE stream consumer, and lazy loader
 ├── output/                      # Default destination for generated Markdown resumes
-├── bootstrap.py                 # System health-check utility for pre-flight assertions
+├── bootstrap.py                 # System health-check utility with intelligent localhost fallback
+├── run_ui.py                    # Root entry point to launch the interactive Web UI
 ├── main.py                      # Click-based CLI entry point
 ├── requirements.txt             # Project dependencies
 ├── .env.example                 # Template environment variables
@@ -52,15 +61,17 @@ resume_rewriter/
 ```
 
 ### Module Descriptions
-- **`config/settings.py`**: Centralizes configuration (database URLs, Ollama endpoint, default loop limits, and score thresholds) via `pydantic-settings`.
-- **`db/`**: Handles database interactions. `schema.sql` manages table creation, while `operations.py` manages deduplication checks and application state updates.
-- **`parsers/`**: An extensible document extraction suite. `resume_parser.py` extracts text from `.pdf`, `.md`, and `.txt` files. `verb_parser.py` parses the attached reference PDF into a clean list of strong verbs.
+- **`config/settings.py`**: Centralizes configuration (database URLs, Ollama endpoint, default loop limits, and score thresholds) via `pydantic-settings`. Prioritizes user configuration in `~/.resume-rewriter/config.env` and supports hot-reloading.
+- **`db/`**: Handles database interactions. `schema.sql` manages table creation with columns for `source_resume_path` and `recruiter_verdict`. `operations.py` manages deduplication checks, cursor-based history pagination, and application state updates.
+- **`parsers/`**: An extensible document extraction suite. `resume_parser.py` extracts text from `.pdf`, `.md`, and `.txt` files.
 - **`scrapers/jd_scraper.py`**: Uses `Crawl4AI` (headless Chromium) to render JavaScript-heavy ATS sites (Greenhouse, Lever, Workday) and `BeautifulSoup` to strip boilerplate (DOM headers, footers, scripts).
 - **`agents/`**: Contains the core intelligence:
   - `state.py`: Defines the typed payload passed through the agent graph.
   - `recruiter.py`, `rewriter.py`, `referral.py`: Individual nodes encapsulating prompts and structured outputs.
   - `workflow.py`: The `StateGraph` that manages the Evaluator-Optimizer loop, early termination conditions, and file exports.
-- **`bootstrap.py`**: Validates that external dependencies (PostgreSQL and Ollama) are online and configured before agent execution starts.
+- **`webapp/`**: Encapsulates the Web UI server and frontend. `server.py` provides REST and SSE streaming endpoints; `pipeline_runner.py` decouples LLM execution into non-blocking background tasks; `assets/` contains the vanilla HTML, CSS, and JS.
+- **`run_ui.py`**: The clean root launcher to start the Web UI dashboard on `http://localhost:8000`.
+- **`bootstrap.py`**: Validates that external dependencies (PostgreSQL and Ollama) are online and configured before agent execution starts, with automatic fallback resolution between `host.docker.internal` and `localhost`.
 - **`main.py`**: The CLI interface. Provides option parsing, status tables, and error diagnostics using `rich`.
 
 ---
@@ -298,3 +309,50 @@ Upon completion of a successful run:
    ```
 2. **Referral Message**: If the match threshold was met, a customized reach-out message is printed directly to the terminal for easy copying.
 3. **Database Record**: All execution details (match score, final status, file paths, and referral messages) are updated in the `job_applications` PostgreSQL table.
+
+---
+
+## 6. Interactive Web UI Dashboard
+
+A modern, dark-themed Web UI is available to interactively tailor resumes and review history:
+
+```bash
+python run_ui.py
+```
+Open **[http://localhost:8000](http://localhost:8000)** in your browser.
+
+### Key Features
+* **Tab 1: Generate Resume (Live Pipeline Stream):**
+  * Drag & drop candidate base resume (`.pdf`, `.md`, `.txt`, `.docx`) — automatically saved to `~/.resume-rewriter/uploads/` for side-by-side version comparison.
+  * Enter Target Company, Requisition ID, and Target Role.
+  * Ingest Job Description via **URL Web Scrape** (Crawl4AI) or **Direct Text / Paste**.
+  * Real-time Server-Sent Events (SSE) stepper reflecting each stage of the LangGraph agent pipeline: Pre-flight Bootstrap, Cache Verification, Content Ingestion, Recruiter Audit rounds (with Match Tier badge, strengths, gaps, and verdict), Re-writer Optimization passes, Referral Outreach, and Artifact saving.
+* **Tab 2: History (Interactive Run Archive):**
+  * **Fully Independent:** Switching between tabs does not disrupt an ongoing generation task.
+  * **Lazy Loading:** Automatically fetches past applications sorted newest-first in batches of 15 records as you scroll.
+  * **Search Bar:** Instantly filter runs by Company, Role, or Requisition ID.
+  * **Inspection Modal:** Click any card to review full Job Details, the Recruiter Audit Verdict, and the drafted Referral Message (with 1-click clipboard copy).
+  * **Document Viewer:** Switch between **Rewritten Resume**, **Original Upload**, and a **Side-by-Side Comparison Diff** with full Markdown syntax highlighting and PDF preview.
+* **System Settings Drawer (Top-Right Gear Icon):**
+  * Edit Ollama host/model, PostgreSQL credentials, and pipeline parameters directly from the browser.
+  * Persisted to `~/.resume-rewriter/config.env` and reused across all runs without needing to touch project files or restart the server.
+  * **Test Connections:** Live connectivity validator for PostgreSQL and Ollama with status indicators.
+
+---
+
+## 7. Troubleshooting & FAQs
+
+### 7.1. "Service Issue" Status Badge in UI
+* **Ollama Host Resolution:** On native Linux, Ollama runs on `http://localhost:11434` (or `http://127.0.0.1:11434`), while `http://host.docker.internal:11434` is only routable inside Docker containers. `bootstrap.py` automatically resolves and falls back to `localhost:11434`.
+* **Hovering Details:** Hover over or click the health pill in the top header (`System Ready` / `Service Issue`) to see exact diagnostic messages for both PostgreSQL and Ollama.
+* **Model Readiness:** Ensure the model specified in settings (e.g. `qwen2.5:7b` or `qwen3:8b`) is pulled locally via `ollama pull <model-name>`.
+
+### 7.2. PostgreSQL Connection Failures
+* Ensure PostgreSQL is running (`sudo systemctl status postgresql` or `pg_isready`).
+* Verify that the database and user match your `~/.resume-rewriter/config.env` settings.
+* Test connectivity using `./env_rr/bin/python bootstrap.py` or the **Test Connections** button in the Web UI Settings drawer.
+
+### 7.3. Force Re-running Cached Applications
+* If an application was already evaluated for a given Company and Job ID, the system caches the result to avoid redundant compute.
+* In the CLI: Add the `--force` / `-f` flag.
+* In the Web UI: Expand the **Advanced Run Configuration** accordion and check **Force re-execution if cached**.
