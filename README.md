@@ -53,8 +53,8 @@ resume_rewriter/
 │       └── js/app.js            # Independent tab logic, SSE stream consumer, and lazy loader
 ├── output/                      # Default destination for generated Markdown resumes
 ├── bootstrap.py                 # System health-check utility with intelligent localhost fallback
-├── run_ui.py                    # Root entry point to launch the interactive Web UI
-├── main.py                      # Click-based CLI entry point
+├── run_gui.py                    # Root entry point to launch the interactive Web UI
+├── run_cli.py                      # Click-based CLI entry point
 ├── requirements.txt             # Project dependencies
 ├── .env.example                 # Template environment variables
 └── README.md                    # Project documentation
@@ -70,9 +70,9 @@ resume_rewriter/
   - `recruiter.py`, `rewriter.py`, `referral.py`: Individual nodes encapsulating prompts and structured outputs.
   - `workflow.py`: The `StateGraph` that manages the Evaluator-Optimizer loop, early termination conditions, and file exports.
 - **`webapp/`**: Encapsulates the Web UI server and frontend. `server.py` provides REST and SSE streaming endpoints; `pipeline_runner.py` decouples LLM execution into non-blocking background tasks; `assets/` contains the vanilla HTML, CSS, and JS.
-- **`run_ui.py`**: The clean root launcher to start the Web UI dashboard on `http://localhost:8000`.
+- **`run_gui.py`**: The clean root launcher to start the Web UI dashboard on `http://localhost:8000`.
 - **`bootstrap.py`**: Validates that external dependencies (PostgreSQL and Ollama) are online and configured before agent execution starts, with automatic fallback resolution between `host.docker.internal` and `localhost`.
-- **`main.py`**: The CLI interface. Provides option parsing, status tables, and error diagnostics using `rich`.
+- **`run_cli.py`**: The CLI interface. Provides option parsing, status tables, and error diagnostics using `rich`.
 
 ---
 
@@ -225,7 +225,7 @@ If any system is unreachable or uninitialized, the diagnostic table will highlig
 
 ---
 
-### Step 2: Running the CLI (`main.py`)
+### Step 2: Running the CLI (`run_cli.py`)
 
 #### Command Line Options
 ```text
@@ -255,7 +255,7 @@ Options:
 
 #### Scenario A: Using a Live Job Posting URL
 ```bash
-python main.py \
+python run_cli.py \
   --resume "data/my_base_resume.pdf" \
   --company "Datadog" \
   --job-id "ENG-4491" \
@@ -267,7 +267,7 @@ python main.py \
 #### Scenario B: Using a Local Job Description File
 Useful when applying to private job portals or internal transfers:
 ```bash
-python main.py \
+python run_cli.py \
   --resume "data/my_base_resume.md" \
   --company "Stripe" \
   --job-id "REQ-9920" \
@@ -281,7 +281,7 @@ python main.py \
 If you run the CLI with an identical `--company` and `--job-id` combination:
 ```bash
 # 1. Normal run (Returns cached score, saved file path, and referral message immediately)
-python main.py \
+python run_cli.py \
   --resume "data/my_base_resume.md" \
   --company "Stripe" \
   --job-id "REQ-9920" \
@@ -289,7 +289,7 @@ python main.py \
   --jd-file "data/stripe_jd.txt"
 
 # 2. Forced re-run (Bypasses cache, clears old result, and re-executes the agent loop)
-python main.py \
+python run_cli.py \
   --resume "data/my_base_resume.md" \
   --company "Stripe" \
   --job-id "REQ-9920" \
@@ -317,7 +317,7 @@ Upon completion of a successful run:
 A modern, dark-themed Web UI is available to interactively tailor resumes and review history:
 
 ```bash
-python run_ui.py
+python run_gui.py
 ```
 Open **[http://localhost:8000](http://localhost:8000)** in your browser.
 
