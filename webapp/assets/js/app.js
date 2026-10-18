@@ -147,6 +147,8 @@ async function handleGenerateSubmit(e) {
   const role = document.getElementById('input-role').value.trim();
   const url = document.getElementById('input-jd-url').value.trim();
   const jdText = document.getElementById('input-jd-text').value.trim();
+  const auxInstructionsEl = document.getElementById('input-auxiliary-instructions');
+  const auxiliaryInstructions = auxInstructionsEl ? auxInstructionsEl.value.trim() : '';
   const minScore = document.getElementById('input-min-score').value;
   const maxLoops = document.getElementById('input-max-loops').value;
   const force = document.getElementById('check-force').checked;
@@ -168,6 +170,7 @@ async function handleGenerateSubmit(e) {
   formData.append('role', role);
   if (state.jdMode === 'url') formData.append('url', url);
   if (state.jdMode === 'text') formData.append('jd_text', jdText);
+  if (auxiliaryInstructions) formData.append('auxiliary_instructions', auxiliaryInstructions);
   if (minScore) formData.append('min_score', minScore);
   if (maxLoops) formData.append('max_loops', maxLoops);
   formData.append('force', force);

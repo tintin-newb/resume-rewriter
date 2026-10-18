@@ -188,6 +188,8 @@ async def run_pipeline_job(task: PipelineTask):
         })
 
         # Step 4: State Initialization
+        auxiliary_instructions = (task.payload.get("auxiliary_instructions") or "").strip()
+
         initial_state: AgentState = {
             "company": company,
             "job_id": job_id,
@@ -196,6 +198,7 @@ async def run_pipeline_job(task: PipelineTask):
             "job_description": job_description,
             "base_resume": base_resume_text,
             "current_resume": base_resume_text,
+            "auxiliary_instructions": auxiliary_instructions or None,
             "iteration": 1,
             "max_loops": max_loops,
             "match_tier": "Pending",
