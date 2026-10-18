@@ -1,0 +1,28 @@
+# Ignore all files by default
+*
+
+# Whitelist only the modules and packages required to run the application
+!agents
+!agents/**
+!config
+!config/**
+!db
+!db/**
+!parsers
+!parsers/**
+!scrapers
+!scrapers/**
+!webapp
+!webapp/**
+
+# Whitelist root Python scripts and requirements
+!bootstrap.py
+!run_gui.py
+!run_cli.py
+!requirements.txt
+
+# Exclude Python bytecode and cache files
+**/__pycache__
+**/__pycache__/**
+**/*.py[cod]
+**/*$py.class
