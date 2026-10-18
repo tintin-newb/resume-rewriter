@@ -13,6 +13,9 @@ class AgentState(TypedDict):
     base_resume: str
     current_resume: str
 
+    # User Auxiliary Guidance
+    auxiliary_instructions: Optional[str]
+
     # Loop Controls
     iteration: int
     max_loops: int

@@ -18,11 +18,11 @@ class MatchTier(str, Enum):
 class RecruiterVerdict(BaseModel):
     match_tier: MatchTier = Field(
         ...,
-        description="Choose strictly one: 'Irrelevant', 'Low Match', 'Average Match', 'High Match', or 'Perfect Match'."
+        description="Categorical tier: 'Irrelevant', 'Low Match', 'Average Match', 'High Match', or 'Perfect Match'."
     )
-    strengths: List[str] = Field(..., description="Genuine matching qualifications present in the resume.")
-    gaps: List[str] = Field(..., description="Crucial missing requirements, missing tools, or domain mismatches.")
-    suggestions: List[str] = Field(..., description="Directives for the Re-writer to address gaps.")
+    strengths: List[str] = Field(..., description="Verified matching qualifications present in the resume.")
+    gaps: List[str] = Field(..., description="Missing core qualifications, domain gaps, or tool discrepancies.")
+    suggestions: List[str] = Field(..., description="Actionable rewording and restructuring guidance for the Re-writer.")
     is_qualified: bool = Field(
         ...,
         description="True ONLY if match_tier is 'High Match' or 'Perfect Match'. Otherwise False."
@@ -32,37 +32,40 @@ class RecruiterVerdict(BaseModel):
 
 RECRUITER_PROMPT = ChatPromptTemplate.from_messages([
     ("system", """You are an elite, uncompromising Executive Tech Recruiter and ATS Auditor.
-Your job is to classify candidate alignment against a Job Description into one of FIVE CATEGORIES.
+Your job is to objectively evaluate candidate alignment against a Job Description into one of FIVE CATEGORIES.
 
 DO NOT BE POLITE. Grade with cold, realistic hiring-manager objectivity.
 
-THE 5 CATEGORICAL EVALUATION TIERS:
+EVALUATION TIERS AND CALIBRATION:
 1. "Irrelevant":
-   - Candidate is in a completely different domain or discipline.
+   - The candidate's discipline or career track is completely unrelated to the role.
 
 2. "Low Match":
-   - Candidate knows the base programming language (e.g., Python), but their primary daily expertise is in the WRONG subfield.
-   - Example: A Computer Vision / Edge AI / DeepStream engineer applying for a Data/ETL developer role that requires daily Pandas/NumPy pipelines and data lake ingestion.
-   - Or lacks critical mandatory requirements (e.g., fails required minimum years of experience).
+   - Domain Misalignment: The candidate has technical skills, but their primary day-to-day specialization is in a different engineering or technical subfield than what the role demands (even if they share common programming languages or generic tools).
+   - Core Deficiencies: Fails mandatory minimum requirements such as required years of commercial experience in the primary domain, or lacks the central production stack.
 
 3. "Average Match":
-   - Candidate has adjacent or foundational skills, but has substantial gaps in mandatory day-to-day tooling or core deliverables.
+   - The candidate has adjacent or transferable experience, but exhibits major gaps in mandatory day-to-day deliverables, key frameworks, or domain methodologies. Needs extensive tailoring to be competitive.
 
 4. "High Match":
-   - Strong candidate. Possesses 80%+ of mandatory requirements, verified commercial experience with the core tech stack, and clear domain relevance. Minor gaps only.
+   - Strong candidate. Possesses 80%+ of core requirements, verified hands-on commercial experience in the primary domain, and clear relevance. Minor gaps only.
 
 5. "Perfect Match":
-   - Flawless fit. Checks 100% of required and nice-to-have criteria with exact industry background.
+   - Rare, exemplary fit. Meets 100% of required and nice-to-have criteria with exact industry and architectural background.
 
-CRITICAL INSTRUCTION:
-- If a candidate's background is primarily Computer Vision / Edge AI and the JD specifically demands a Data/ETL Developer with heavy Pandas/NumPy and 3-5 years exp, classify as 'Low Match' or 'Average Match'. DO NOT select 'High Match'."""),
+GENERIC CALIBRATION PRINCIPLE:
+- Never award 'High Match' or 'Perfect Match' simply because a candidate shares a programming language or generic technical baseline. 
+- If the role requires daily production mastery of a specific specialization and the candidate's career has been spent in a different domain, strictly classify them as 'Low Match' or 'Average Match'.
+
+USER AUXILIARY INSTRUCTIONS:
+{auxiliary_instructions}"""),
     ("user", """--- JOB DESCRIPTION ---
 {job_description}
 
 --- CANDIDATE RESUME ---
 {current_resume}
 
-Select the exact categorical match_tier and provide the evaluation schema.""")
+Select the exact categorical match_tier and provide the audit schema now.""")
 ])
 
 
@@ -75,10 +78,13 @@ def recruiter_node(state: AgentState) -> Dict[str, Any]:
         num_predict=2048
     ).with_structured_output(RecruiterVerdict)
 
+    aux_instructions = state.get("auxiliary_instructions") or "None provided. Apply standard strict evaluation."
+
     chain = RECRUITER_PROMPT | llm
     verdict: RecruiterVerdict = chain.invoke({
         "job_description": state["job_description"],
-        "current_resume": state["current_resume"]
+        "current_resume": state["current_resume"],
+        "auxiliary_instructions": aux_instructions
     })
 
     return {
