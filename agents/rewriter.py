@@ -3,7 +3,10 @@ from pydantic import BaseModel, Field
 from langchain_ollama import ChatOllama
 from langchain_core.prompts import ChatPromptTemplate
 from config.settings import settings
-from config.action_verbs import get_formatted_action_verbs_prompt
+try:
+    from config.action_verbs import get_formatted_action_verbs_prompt
+except ImportError:
+    from config.actions_verbs import get_formatted_action_verbs_prompt
 from agents.state import AgentState
 
 
@@ -22,27 +25,23 @@ REWRITER_PROMPT = ChatPromptTemplate.from_messages([
     ("system", """You are an Executive Tech Resume Strategist.
 Optimize the candidate's EXISTING resume to match the target Job Description (JD).
 
-1. IMPACT-DRIVEN BULLET POINTS (THE GOOGLE "XYZ" PHILOSOPHY):
-   - Every accomplishment must follow the spirit of Google's XYZ formula: [Action Verb] + [Technical Scope/Action] + [Quantified Outcome/Impact].
-   - FORBIDDEN PHRASING: NEVER literally write the words "as measured by", "Accomplished [X]", or "by doing [Z]". That is an internal framework, NOT visible resume text.
-   - Bullets must read naturally and professionally.
-   * POOR (Robotic): "Accomplished stream orchestration, as measured by 80% reduction, by architecting a load balancer."
-   * EXCELLENT (Organic): "Reduced manual stream orchestration by 80% and ensured 100% database-to-node consistency by architecting a distributed NVIDIA DeepStream load balancer with automated failover."
-   * EXCELLENT (Organic): "Boosted traffic violation detection accuracy by 15% and accelerated inference throughput 10× by fine-tuning Qwen2-VL-7B using LoRA and optimizing vLLM deployment."
+1. IMPACT-DRIVEN BULLET POINTS (GOOGLE "XYZ" PHILOSOPHY):
+   - Format: [Action Verb] + [Technical Scope/Action] + [Quantified Outcome/Impact].
+   - FORBIDDEN: NEVER literally write the words "as measured by", "Accomplished [X]", or "by doing [Z]".
+   - Bullets must read naturally, convincingly, and professionally.
 
 2. STRICT PROHIBITION ON METRIC CROSS-CONTAMINATION:
-   - NEVER steal metrics from academic projects to insert into professional work experience (e.g., do NOT attach UCF-101 or ROUGE scores to Griffyn Robotech or Sabre Corp).
-   - Metrics belong strictly to the job or project where they originally occurred.
+   - NEVER transfer metrics from academic projects to professional jobs. Metrics belong strictly to the job or project where they occurred.
 
-3. CANDIDATE IDENTITY & INSTITUTION INTEGRITY:
-   - CANDIDATE NAME: Retain the exact candidate name, email, phone, and links from the base resume.
-   - Retain exact company names, locations, degree titles, and dates.
+3. FIDELITY & IDENTITY CONSTRAINTS:
+   - Retain exact candidate name, email, phone, links, company names, institutions, and dates.
+   - ZERO HALLUCINATION: Rephrase existing accomplishments to emphasize transferable elements, but NEVER invent new roles, tools, or fake metrics.
 
-4. CATEGORIZED ACTION VERBS:
-   - Anchor bullet points with strong active verbs chosen from the appropriate category in the provided catalog.
+4. ACTION VERBS:
+   - Anchor bullets with strong active verbs chosen from the appropriate category in the provided catalog.
 
-5. OUTPUT FORMAT:
-   - Complete, publication-grade Markdown from top to bottom. Do NOT abbreviate."""),
+USER AUXILIARY INSTRUCTIONS:
+{auxiliary_instructions}"""),
     ("user", """--- TARGET JOB DESCRIPTION ---
 {job_description}
 
@@ -60,7 +59,7 @@ Suggestions:
 --- BASE CANDIDATE RESUME ---
 {current_resume}
 
-Rewrite the complete resume in Markdown now. Ensure bullets flow naturally with organic impact (NO "as measured by" phrasing).""")
+Rewrite the complete resume in Markdown now.""")
 ])
 
 
@@ -68,18 +67,21 @@ def rewriter_node(state: AgentState) -> Dict[str, Any]:
     llm = ChatOllama(
         model=settings.OLLAMA_MODEL,
         base_url=settings.OLLAMA_BASE_URL,
-        temperature=settings.REWRITER_TEMP,
+        temperature=0.1,
         num_ctx=8192,
         num_predict=4096
     ).with_structured_output(RewriterResult)
 
+    aux_instructions = state.get("auxiliary_instructions") or "None provided. Apply standard tailoring guidelines."
+
     chain = REWRITER_PROMPT | llm
     result: RewriterResult = chain.invoke({
         "job_description": state["job_description"],
-        "match_tier": state.get("match_tier", "Low Match"),  # <-- String enum
+        "match_tier": state.get("match_tier", "Low Match"),
         "gaps": "\n".join(f"- {g}" for g in state["gaps"]),
         "suggestions": "\n".join(f"- {s}" for s in state["suggestions"]),
         "action_verbs_by_category": get_formatted_action_verbs_prompt(),
+        "auxiliary_instructions": aux_instructions,
         "current_resume": state["current_resume"]
     })
 
