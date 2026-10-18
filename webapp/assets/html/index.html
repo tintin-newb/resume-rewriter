@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/css/style.css">
+  <link rel="stylesheet" href="/assets/css/style.css?v=2.0.0">
   <!-- Marked.js for fast, safe markdown document rendering -->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
@@ -117,21 +117,23 @@
               </div>
             </div>
 
+            <!-- Auxiliary Instructions (Stateless Guidance) -->
+            <div class="form-group">
+              <label class="form-label" for="input-auxiliary-instructions">
+                Auxiliary Instructions / Guidance <span style="font-size: 0.75rem; color: var(--text-subtle); font-weight: normal;">(Optional)</span>
+              </label>
+              <textarea id="input-auxiliary-instructions" class="form-textarea" style="min-height: 75px; resize: vertical;" placeholder="e.g. Focus on distributed systems & Kafka; maintain senior-level tone; emphasize cloud architectures."></textarea>
+            </div>
+
             <!-- Advanced Run Options Accordion -->
             <div class="accordion-header" onclick="toggleAccordion('advanced-options')">
               <span>Advanced Run Configuration</span>
               <span id="accordion-arrow">▼</span>
             </div>
             <div id="advanced-options" class="accordion-body">
-              <div class="form-row">
-                <div class="form-group">
-                  <label class="form-label" for="input-min-score">Target Score</label>
-                  <input type="number" id="input-min-score" class="form-input" value="8.0" step="0.5" min="1" max="10">
-                </div>
-                <div class="form-group">
-                  <label class="form-label" for="input-max-loops">Max Rewriter Passes</label>
-                  <input type="number" id="input-max-loops" class="form-input" value="3" min="1" max="6">
-                </div>
+              <div class="form-group">
+                <label class="form-label" for="input-max-loops">Max Rewriter Passes</label>
+                <input type="number" id="input-max-loops" class="form-input" value="3" min="1" max="6">
               </div>
               <div class="form-group" style="display: flex; gap: 20px; align-items: center; margin-top: 6px;">
                 <label style="display: flex; align-items: center; gap: 8px; font-size: 0.8125rem; color: var(--text-muted); cursor: pointer;">
@@ -254,15 +256,9 @@
         </div>
 
         <!-- Pipeline Tuning Defaults -->
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label" for="cfg-min-score">Default Min Score</label>
-            <input type="number" id="cfg-min-score" class="form-input" value="8.0" step="0.5">
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="cfg-max-loops">Default Max Loops</label>
-            <input type="number" id="cfg-max-loops" class="form-input" value="3">
-          </div>
+        <div class="form-group">
+          <label class="form-label" for="cfg-max-loops">Default Max Loops</label>
+          <input type="number" id="cfg-max-loops" class="form-input" value="3">
         </div>
 
         <!-- Temperatures -->
@@ -309,6 +305,7 @@
             <button id="btn-doc-rewritten" class="segmented-btn active" onclick="switchDocMode('rewritten')">Rewritten Resume</button>
             <button id="btn-doc-source" class="segmented-btn" onclick="switchDocMode('source')">Original Upload</button>
             <button id="btn-doc-diff" class="segmented-btn" onclick="switchDocMode('diff')">Side-by-Side Comparison</button>
+            <button id="btn-doc-referral" class="segmented-btn" onclick="switchDocMode('referral')">✉ Referral Message</button>
           </div>
           <button id="btn-copy-doc" class="btn-secondary" onclick="copyActiveDocument()">Copy Markdown</button>
         </div>
@@ -357,6 +354,6 @@
   <div id="toast-container" class="toast-container"></div>
 
   <!-- Main Application Script -->
-  <script src="/assets/js/app.js"></script>
+  <script src="/assets/js/app.js?v=2.0.0"></script>
 </body>
 </html>

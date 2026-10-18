@@ -7,8 +7,9 @@ from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
 
 class JDScraper:
     """
-    Asynchronously crawls dynamic job postings using Crawl4AI 
-    and sanitizes HTML content with BeautifulSoup.
+    Asynchronously crawls dynamic job postings using Crawl4AI and extracts
+    structured job content via JSON-LD schema (JobPosting) or BeautifulSoup sanitization.
+    Supports modern single-page applications (SPAs) with render delays and content validation.
     """
 
     def __init__(self):
@@ -19,6 +20,7 @@ class JDScraper:
         )
         self.run_config = CrawlerRunConfig(
             word_count_threshold=10,
+            delay_before_return_html=2.0,
             excluded_tags=["nav", "footer", "header", "script", "style", "aside", "form"]
         )
 
@@ -29,15 +31,54 @@ class JDScraper:
                 raise RuntimeError(f"Failed to crawl URL: {url}. Error: {result.error_message}")
             return result.html
 
+    def _extract_from_ld_json(self, soup: BeautifulSoup) -> Optional[str]:
+        """Extracts structured JobPosting schema if available (standard for major ATS platforms)."""
+        import json
+        import html
+        for script in soup.find_all("script", type="application/ld+json"):
+            if not script.string:
+                continue
+            try:
+                data = json.loads(script.string.strip())
+                candidates = []
+                if isinstance(data, list):
+                    candidates.extend(data)
+                elif isinstance(data, dict):
+                    if "@graph" in data and isinstance(data["@graph"], list):
+                        candidates.extend(data["@graph"])
+                    else:
+                        candidates.append(data)
+
+                for item in candidates:
+                    if isinstance(item, dict) and item.get("@type") == "JobPosting":
+                        desc = item.get("description", "")
+                        if desc:
+                            desc_soup = BeautifulSoup(html.unescape(desc), "html.parser")
+                            text = desc_soup.get_text(separator="\n")
+                            cleaned = "\n".join(l.strip() for l in text.splitlines() if l.strip())
+                            if len(cleaned) >= 100:
+                                title = item.get("title", "")
+                                org = item.get("hiringOrganization", {}).get("name", "") if isinstance(item.get("hiringOrganization"), dict) else ""
+                                header = f"{title} - {org}\n\n" if title else ""
+                                return header + cleaned
+            except Exception:
+                continue
+        return None
+
     def _clean_html(self, raw_html: str) -> str:
         """Strips leftover boilerplate, cookie notices, and layout artifacts."""
         soup = BeautifulSoup(raw_html, "html.parser")
 
-        # Strip remaining non-content tags
+        # 1. First attempt to extract structured JobPosting JSON-LD before stripping tags
+        ld_text = self._extract_from_ld_json(soup)
+        if ld_text:
+            return ld_text
+
+        # 2. Strip non-content tags for DOM extraction fallback
         for element in soup(["script", "style", "nav", "footer", "header", "noscript", "svg", "button"]):
             element.decompose()
 
-        # Prioritize job content wrappers if identifiable
+        # 3. Prioritize job content wrappers that actually contain substantial content
         content_selectors = [
             {"id": re.compile(r"(job-description|job-details|content|posting-description)", re.I)},
             {"class_": re.compile(r"(job-description|job-details|description|posting-content)", re.I)},
@@ -48,10 +89,12 @@ class JDScraper:
 
         target_container = None
         for selector in content_selectors:
-            if isinstance(selector, dict):
-                target_container = soup.find(**selector)
-            else:
-                target_container = soup.find(selector)
+            candidates = soup.find_all(**selector) if isinstance(selector, dict) else soup.find_all(selector)
+            for cand in candidates:
+                cand_text = cand.get_text(strip=True)
+                if len(cand_text) >= 100:
+                    target_container = cand
+                    break
             if target_container:
                 break
 

@@ -15,7 +15,8 @@ from config.settings import (
     get_active_env_file, 
     save_home_env_config, 
     reload_settings, 
-    APP_UPLOADS_DIR
+    APP_UPLOADS_DIR,
+    APP_OUTPUT_DIR
 )
 from bootstrap import SystemBootstrap
 from db.operations import get_applications_history, get_application_by_id
@@ -35,6 +36,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def add_no_cache_headers(request, call_next):
+    response = await call_next(request)
+    if request.url.path == "/" or request.url.path.startswith("/assets/"):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
 
 # Assets directory located inside webapp/assets
 ASSETS_DIR = Path(__file__).resolve().parent / "assets"
@@ -71,7 +81,6 @@ class ConfigUpdateRequest(BaseModel):
     POSTGRES_DB: Optional[str] = None
     POSTGRES_USER: Optional[str] = None
     POSTGRES_PASSWORD: Optional[str] = None
-    MIN_MATCH_SCORE: Optional[float] = None
     MAX_LOOPS: Optional[int] = None
 
 
@@ -91,7 +100,6 @@ async def get_config():
             "POSTGRES_DB": settings.POSTGRES_DB,
             "POSTGRES_USER": settings.POSTGRES_USER,
             "POSTGRES_PASSWORD": settings.POSTGRES_PASSWORD,
-            "MIN_MATCH_SCORE": settings.MIN_MATCH_SCORE,
             "MAX_LOOPS": settings.MAX_LOOPS,
             "OUTPUT_DIR": str(settings.OUTPUT_DIR),
             "UPLOADS_DIR": str(APP_UPLOADS_DIR)
@@ -120,7 +128,6 @@ async def update_config(req: ConfigUpdateRequest):
             "POSTGRES_PORT": settings.POSTGRES_PORT,
             "POSTGRES_DB": settings.POSTGRES_DB,
             "POSTGRES_USER": settings.POSTGRES_USER,
-            "MIN_MATCH_SCORE": settings.MIN_MATCH_SCORE,
             "MAX_LOOPS": settings.MAX_LOOPS,
         }
     }
@@ -155,6 +162,7 @@ async def start_generation(
     role: str = Form(...),
     url: Optional[str] = Form(None),
     jd_text: Optional[str] = Form(None),
+    auxiliary_instructions: Optional[str] = Form(None),
     force: bool = Form(False),
     min_score: Optional[float] = Form(None),
     max_loops: Optional[int] = Form(None),
@@ -184,6 +192,7 @@ async def start_generation(
         "role": role.strip(),
         "url": url.strip() if url else None,
         "jd_text": jd_text.strip() if jd_text else None,
+        "auxiliary_instructions": auxiliary_instructions.strip() if auxiliary_instructions else None,
         "force": force,
         "min_score": min_score,
         "max_loops": max_loops,
@@ -273,7 +282,12 @@ async def get_document(doc_type: str, app_id: int):
 
     doc_path = Path(path_str)
     if not doc_path.exists():
-        raise HTTPException(status_code=404, detail=f"File not found on disk at: {path_str}")
+        fallback_dir = APP_UPLOADS_DIR if doc_type == "source" else APP_OUTPUT_DIR
+        candidate = fallback_dir / doc_path.name
+        if candidate.exists():
+            doc_path = candidate
+        else:
+            raise HTTPException(status_code=404, detail=f"File not found on disk at: {path_str}")
 
     suffix = doc_path.suffix.lower()
     if suffix == ".pdf":

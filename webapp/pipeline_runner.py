@@ -64,7 +64,6 @@ async def run_pipeline_job(task: PipelineTask):
     jd_text = p.get("jd_text")
     force = bool(p.get("force", False))
     max_loops = int(p.get("max_loops") or settings.MAX_LOOPS)
-    min_score = float(p.get("min_score") or settings.MIN_MATCH_SCORE)
     skip_bootstrap = bool(p.get("skip_bootstrap", False))
     source_resume_path = p.get("source_resume_path")
 
@@ -188,6 +187,8 @@ async def run_pipeline_job(task: PipelineTask):
         })
 
         # Step 4: State Initialization
+        auxiliary_instructions = (task.payload.get("auxiliary_instructions") or "").strip()
+
         initial_state: AgentState = {
             "company": company,
             "job_id": job_id,
@@ -196,6 +197,7 @@ async def run_pipeline_job(task: PipelineTask):
             "job_description": job_description,
             "base_resume": base_resume_text,
             "current_resume": base_resume_text,
+            "auxiliary_instructions": auxiliary_instructions or None,
             "iteration": 1,
             "max_loops": max_loops,
             "match_tier": "Pending",

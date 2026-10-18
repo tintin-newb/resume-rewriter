@@ -5,6 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 APP_HOME_DIR: Path = Path.home() / ".resume-rewriter"
 APP_UPLOADS_DIR: Path = APP_HOME_DIR / "uploads"
+APP_OUTPUT_DIR: Path = APP_HOME_DIR / "output"
 APP_HOME_ENV: Path = APP_HOME_DIR / "config.env"
 LEGACY_HOME_ENV: Path = Path.home() / ".resume-rewriter.env"
 
@@ -13,6 +14,7 @@ def get_active_env_file() -> Path:
     """Returns the primary home configuration env path, initializing if needed."""
     APP_HOME_DIR.mkdir(parents=True, exist_ok=True)
     APP_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+    APP_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     if LEGACY_HOME_ENV.exists() and not APP_HOME_ENV.exists():
         return LEGACY_HOME_ENV
@@ -50,9 +52,8 @@ class Settings(BaseSettings):
     POSTGRES_PASSWORD: str = ""
 
     # Pipeline Settings
-    MIN_MATCH_SCORE: float = 8.0
     MAX_LOOPS: int = 3
-    OUTPUT_DIR: Path = Path("output")
+    OUTPUT_DIR: Path = APP_OUTPUT_DIR
 
     model_config = SettingsConfigDict(
         env_file=(str(active_env_path), ".env"),

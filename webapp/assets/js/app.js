@@ -147,7 +147,8 @@ async function handleGenerateSubmit(e) {
   const role = document.getElementById('input-role').value.trim();
   const url = document.getElementById('input-jd-url').value.trim();
   const jdText = document.getElementById('input-jd-text').value.trim();
-  const minScore = document.getElementById('input-min-score').value;
+  const auxInstructionsEl = document.getElementById('input-auxiliary-instructions');
+  const auxiliaryInstructions = auxInstructionsEl ? auxInstructionsEl.value.trim() : '';
   const maxLoops = document.getElementById('input-max-loops').value;
   const force = document.getElementById('check-force').checked;
   const skipBootstrap = document.getElementById('check-skip-bootstrap').checked;
@@ -168,7 +169,7 @@ async function handleGenerateSubmit(e) {
   formData.append('role', role);
   if (state.jdMode === 'url') formData.append('url', url);
   if (state.jdMode === 'text') formData.append('jd_text', jdText);
-  if (minScore) formData.append('min_score', minScore);
+  if (auxiliaryInstructions) formData.append('auxiliary_instructions', auxiliaryInstructions);
   if (maxLoops) formData.append('max_loops', maxLoops);
   formData.append('force', force);
   formData.append('skip_bootstrap', skipBootstrap);
@@ -468,6 +469,7 @@ function renderHistoryItems(items, reset) {
     const isPass = ['High Match', 'Perfect Match'].includes(tier);
     const tierClass = isPass ? 'high' : 'average';
     const updatedTime = item.updated_at ? new Date(item.updated_at).toLocaleDateString() : '';
+    const hasReferral = Boolean(item.referral_message && item.referral_message.trim());
 
     card.innerHTML = `
       <div>
@@ -477,17 +479,35 @@ function renderHistoryItems(items, reset) {
             <div class="history-role">${escapeHtml(item.role)}</div>
             <span class="history-job-id">${escapeHtml(item.job_id)}</span>
           </div>
-          <span class="badge-tier ${tierClass}">${tier}</span>
+          <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+            <span class="badge-tier ${tierClass}">${tier}</span>
+            ${hasReferral ? `<span class="badge-tier referral" style="cursor: pointer;" title="Click to view referral note" onclick="event.stopPropagation(); openDetailModal(${item.id}, 'referral')">✉ Referral</span>` : ''}
+          </div>
         </div>
 
         <div class="history-summary">
           ${item.recruiter_verdict ? escapeHtml(item.recruiter_verdict) : '<em>No recruiter audit summary available.</em>'}
         </div>
+
+        ${hasReferral ? `
+          <div class="history-referral-box" style="cursor: pointer;" title="Click to view full referral message" onclick="event.stopPropagation(); openDetailModal(${item.id}, 'referral')">
+            <div class="history-referral-box-header">
+              <span>✉ Referral Outreach Note</span>
+              <span style="font-size: 0.7rem; font-weight: 500; opacity: 0.85;">View Note →</span>
+            </div>
+            <div class="history-referral-text">${escapeHtml(item.referral_message)}</div>
+          </div>
+        ` : ''}
       </div>
 
       <div class="history-footer">
         <span>Updated: ${updatedTime}</span>
         <div class="history-actions" onclick="event.stopPropagation()">
+          ${hasReferral ? `
+            <button class="btn-secondary" style="padding: 4px 10px; font-size: 0.75rem; border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald);" onclick="event.stopPropagation(); openDetailModal(${item.id}, 'referral')">
+              ✉ Referral
+            </button>
+          ` : ''}
           <button class="btn-secondary" style="padding: 4px 10px; font-size: 0.75rem;" onclick="openDetailModal(${item.id})">
             Inspect Details
           </button>
@@ -500,7 +520,7 @@ function renderHistoryItems(items, reset) {
 }
 
 // --- Run Details Modal & Document Viewer ---
-async function openDetailModal(appId) {
+async function openDetailModal(appId, initialMode = 'rewritten') {
   const modalBackdrop = document.getElementById('modal-detail-backdrop');
   modalBackdrop.classList.add('open');
 
@@ -532,15 +552,19 @@ async function openDetailModal(appId) {
     document.getElementById('modal-recruiter-verdict').textContent = record.recruiter_verdict || 'No verdict recorded for this run.';
 
     const referralWrap = document.getElementById('modal-referral-wrap');
-    if (record.referral_message) {
-      referralWrap.style.display = 'block';
+    const btnReferralTab = document.getElementById('btn-doc-referral');
+    const hasReferral = Boolean(record.referral_message && record.referral_message.trim());
+    if (hasReferral) {
       document.getElementById('modal-referral-message').textContent = record.referral_message;
+      if (btnReferralTab) btnReferralTab.style.display = 'inline-block';
     } else {
-      referralWrap.style.display = 'none';
+      if (referralWrap) referralWrap.style.display = 'none';
+      if (btnReferralTab) btnReferralTab.style.display = 'none';
     }
 
-    // Default to rewritten resume view
-    switchDocMode('rewritten');
+    // Default to requested mode (fallback to rewritten if referral requested but not available)
+    const targetMode = (initialMode === 'referral' && hasReferral) ? 'referral' : 'rewritten';
+    await switchDocMode(targetMode);
 
   } catch (err) {
     showToast(`Error opening modal: ${err.message}`, 'error');
@@ -557,20 +581,65 @@ async function switchDocMode(mode) {
   document.getElementById('btn-doc-rewritten').classList.toggle('active', mode === 'rewritten');
   document.getElementById('btn-doc-source').classList.toggle('active', mode === 'source');
   document.getElementById('btn-doc-diff').classList.toggle('active', mode === 'diff');
+  const btnReferral = document.getElementById('btn-doc-referral');
+  if (btnReferral) btnReferral.classList.toggle('active', mode === 'referral');
+
+  const btnCopyDoc = document.getElementById('btn-copy-doc');
+  if (btnCopyDoc) {
+    btnCopyDoc.textContent = mode === 'referral' ? 'Copy Referral Message' : 'Copy Markdown';
+  }
 
   const singleViewer = document.getElementById('doc-viewer-single');
   const diffViewer = document.getElementById('doc-viewer-diff');
+  const referralWrap = document.getElementById('modal-referral-wrap');
 
   if (!state.activeDetail) return;
   const appId = state.activeDetail.id;
 
+  if (mode === 'referral') {
+    if (referralWrap) referralWrap.style.display = 'none';
+    singleViewer.style.display = 'block';
+    diffViewer.style.display = 'none';
+
+    const referralMsg = state.activeDetail.referral_message;
+    if (!referralMsg) {
+      singleViewer.innerHTML = `<p style="color: var(--accent-amber);">No cold referral message recorded for this application.</p>`;
+      return;
+    }
+
+    singleViewer.innerHTML = `
+      <div style="background: rgba(16, 185, 129, 0.04); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: var(--radius-md); padding: 18px; margin-bottom: 12px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; border-bottom: 1px solid rgba(16, 185, 129, 0.2); padding-bottom: 10px;">
+          <div>
+            <div style="font-weight: 700; color: var(--accent-emerald); font-size: 0.95rem; display: flex; align-items: center; gap: 6px;">
+              <span>✉</span> Tailored Referral Outreach Note
+            </div>
+            <div style="font-size: 0.775rem; color: var(--text-muted); margin-top: 2px;">
+              Company: <strong style="color: var(--text-main);">${escapeHtml(state.activeDetail.company || 'Company')}</strong> | Role: <strong style="color: var(--text-main);">${escapeHtml(state.activeDetail.role || 'Role')}</strong>
+            </div>
+          </div>
+          <button class="btn-primary" style="width: auto; padding: 6px 14px; font-size: 0.78rem; margin-top: 0; background: var(--accent-emerald);" onclick="copyReferralMessage()">
+            Copy Message
+          </button>
+        </div>
+        <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 14px; font-family: var(--font-mono); font-size: 0.85rem; line-height: 1.6; color: var(--text-main); white-space: pre-wrap; user-select: all;">${escapeHtml(referralMsg)}</div>
+        <p style="font-size: 0.75rem; color: var(--text-subtle); margin-top: 10px; margin-bottom: 0;">
+          💡 <em>Pro-tip: Send this directly to an engineering peer or recruiter at ${escapeHtml(state.activeDetail.company || 'the target company')}.</em>
+        </p>
+      </div>
+    `;
+    return;
+  }
+
   if (mode === 'diff') {
+    if (referralWrap && state.activeDetail.referral_message) referralWrap.style.display = 'block';
     singleViewer.style.display = 'none';
     diffViewer.style.display = 'grid';
     await renderDiffView(appId);
     return;
   }
 
+  if (referralWrap && state.activeDetail.referral_message) referralWrap.style.display = 'block';
   singleViewer.style.display = 'block';
   diffViewer.style.display = 'none';
 
@@ -662,23 +731,60 @@ async function renderDiffView(appId) {
   }
 }
 
+function copyToClipboard(text, successMsg = 'Copied to clipboard!') {
+  if (!text || !text.trim()) {
+    showToast('Nothing to copy.', 'info');
+    return;
+  }
+  const clean = text.trim();
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(clean)
+      .then(() => showToast(successMsg, 'success'))
+      .catch(() => fallbackCopy(clean, successMsg));
+  } else {
+    fallbackCopy(clean, successMsg);
+  }
+}
+
+function fallbackCopy(text, successMsg) {
+  try {
+    const el = document.createElement('textarea');
+    el.value = text;
+    el.setAttribute('readonly', '');
+    el.style.position = 'absolute';
+    el.style.left = '-9999px';
+    document.body.appendChild(el);
+    el.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(el);
+    if (ok) {
+      showToast(successMsg, 'success');
+    } else {
+      showToast('Unable to copy text.', 'error');
+    }
+  } catch (err) {
+    showToast('Copy failed.', 'error');
+  }
+}
+
 function copyActiveDocument() {
+  if (state.activeDocMode === 'referral') {
+    copyReferralMessage();
+    return;
+  }
   const docType = state.activeDocMode === 'source' ? 'source' : 'rewritten';
   const cached = state.docCache[docType];
   if (cached && cached.content) {
-    navigator.clipboard.writeText(cached.content);
-    showToast('Markdown copied to clipboard!', 'success');
+    copyToClipboard(cached.content, 'Markdown copied to clipboard!');
   } else {
     showToast('No markdown text to copy.', 'info');
   }
 }
 
 function copyReferralMessage() {
-  const msg = document.getElementById('modal-referral-message').textContent;
-  if (msg) {
-    navigator.clipboard.writeText(msg);
-    showToast('Referral message copied to clipboard!', 'success');
-  }
+  const msg = (state.activeDetail && state.activeDetail.referral_message) ||
+              document.getElementById('modal-referral-message').textContent;
+  copyToClipboard(msg, 'Referral message copied to clipboard!');
 }
 
 // --- Settings & Configuration Drawer ---
@@ -710,7 +816,6 @@ async function loadConfig() {
     document.getElementById('cfg-pg-db').value = s.POSTGRES_DB || '';
     document.getElementById('cfg-pg-user').value = s.POSTGRES_USER || '';
     document.getElementById('cfg-pg-pass').value = s.POSTGRES_PASSWORD || '';
-    document.getElementById('cfg-min-score').value = s.MIN_MATCH_SCORE || 8.0;
     document.getElementById('cfg-max-loops').value = s.MAX_LOOPS || 3;
     document.getElementById('cfg-rewriter-temp').value = s.REWRITER_TEMP !== undefined ? s.REWRITER_TEMP : 0.2;
     document.getElementById('cfg-recruiter-temp').value = s.RECRUITER_TEMP !== undefined ? s.RECRUITER_TEMP : 0.0;
@@ -729,7 +834,6 @@ async function saveSystemConfig() {
     POSTGRES_DB: document.getElementById('cfg-pg-db').value.trim(),
     POSTGRES_USER: document.getElementById('cfg-pg-user').value.trim(),
     POSTGRES_PASSWORD: document.getElementById('cfg-pg-pass').value,
-    MIN_MATCH_SCORE: parseFloat(document.getElementById('cfg-min-score').value) || 8.0,
     MAX_LOOPS: parseInt(document.getElementById('cfg-max-loops').value) || 3,
     REWRITER_TEMP: parseFloat(document.getElementById('cfg-rewriter-temp').value) || 0.2,
     RECRUITER_TEMP: parseFloat(document.getElementById('cfg-recruiter-temp').value) || 0.0,

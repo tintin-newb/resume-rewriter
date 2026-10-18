@@ -59,12 +59,7 @@ console = Console()
     default=False,
     help="Force re-execution even if the job posting was already processed in the database."
 )
-@click.option(
-    "--min-score",
-    type=float,
-    default=None,
-    help=f"Minimum target score to exit loop (default: {settings.MIN_MATCH_SCORE})."
-)
+
 @click.option(
     "--max-loops",
     type=int,
@@ -77,6 +72,12 @@ console = Console()
     default=False,
     help="Skip pre-flight health checks for Ollama and PostgreSQL."
 )
+@click.option(
+    "--instructions", "-i",
+    type=str,
+    default=None,
+    help="Auxiliary instructions/guidance for Recruiter evaluation and Re-writer tailoring (accepts a string or path to a .txt file)."
+)
 def run_cli(
     resume: Path,
     company: str,
@@ -85,8 +86,8 @@ def run_cli(
     url: Optional[str],
     jd_file: Optional[Path],
     force: bool,
-    min_score: Optional[float],
     max_loops: Optional[int],
+    instructions: Optional[str],
     skip_bootstrap: bool
 ):
     """
@@ -162,8 +163,18 @@ def run_cli(
         sys.exit(1)
 
     # --- 5. State Initialization ---
-    target_min_score = min_score if min_score is not None else settings.MIN_MATCH_SCORE
     target_max_loops = max_loops if max_loops is not None else settings.MAX_LOOPS
+
+     # --- 6. Parse Auxiliary Instructions (File or Raw String) ---
+    aux_text = ""
+    if instructions:
+        inst_path = Path(instructions)
+        if inst_path.is_file():
+            console.print(f"[cyan]Loading auxiliary instructions from file:[/cyan] {inst_path}")
+            aux_text = inst_path.read_text(encoding="utf-8").strip()
+        else:
+            aux_text = instructions.strip()
+        console.print(f"[green]Active Auxiliary Guidance:[/green] [dim]\"{aux_text[:100]}...\"[/dim]\n")
 
     initial_state: AgentState = {
         "company": company,
@@ -173,6 +184,7 @@ def run_cli(
         "job_description": job_description,
         "base_resume": base_resume_text,
         "current_resume": base_resume_text,
+        "auxiliary_instructions": aux_text,  # <-- Injected into state
         "iteration": 1,
         "max_loops": max_loops or settings.MAX_LOOPS,
         "match_tier": "Pending",
@@ -187,7 +199,7 @@ def run_cli(
         "status": "PROCESSING"
     }
 
-    # --- 6. Live Streamed Workflow Execution ---
+    # --- 7. Live Streamed Workflow Execution ---
     console.print("\n[bold magenta]Compiling & executing LangGraph agent pipeline...[/bold magenta]\n")
     workflow = build_workflow()
 
@@ -231,7 +243,7 @@ def run_cli(
             elif node_name == "save_artifacts":
                 console.print(f"[bold dim]✓ Node: Exported optimized resume to: {node_output.get('saved_file_path')}[/bold dim]\n")
 
-    # --- 7. PostgreSQL Persistence ---
+    # --- 8. PostgreSQL Persistence ---
     try:
         save_application_state(final_state)
         console.print("[green]Successfully persisted run artifacts to PostgreSQL.[/green]\n")
