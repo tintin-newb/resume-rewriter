@@ -481,7 +481,7 @@ function renderHistoryItems(items, reset) {
           </div>
           <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
             <span class="badge-tier ${tierClass}">${tier}</span>
-            ${hasReferral ? '<span class="badge-tier referral" title="Tailored outreach message ready">✉ Referral</span>' : ''}
+            ${hasReferral ? `<span class="badge-tier referral" style="cursor: pointer;" title="Click to view referral note" onclick="event.stopPropagation(); openDetailModal(${item.id}, 'referral')">✉ Referral</span>` : ''}
           </div>
         </div>
 
@@ -490,10 +490,10 @@ function renderHistoryItems(items, reset) {
         </div>
 
         ${hasReferral ? `
-          <div class="history-referral-box">
+          <div class="history-referral-box" style="cursor: pointer;" title="Click to view full referral message" onclick="event.stopPropagation(); openDetailModal(${item.id}, 'referral')">
             <div class="history-referral-box-header">
               <span>✉ Referral Outreach Note</span>
-              <span style="font-size: 0.7rem; font-weight: 500; opacity: 0.85;">Preview</span>
+              <span style="font-size: 0.7rem; font-weight: 500; opacity: 0.85;">View Note →</span>
             </div>
             <div class="history-referral-text">${escapeHtml(item.referral_message)}</div>
           </div>
@@ -504,7 +504,7 @@ function renderHistoryItems(items, reset) {
         <span>Updated: ${updatedTime}</span>
         <div class="history-actions" onclick="event.stopPropagation()">
           ${hasReferral ? `
-            <button class="btn-secondary" style="padding: 4px 10px; font-size: 0.75rem; border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald);" onclick="openDetailModal(${item.id}, 'referral')">
+            <button class="btn-secondary" style="padding: 4px 10px; font-size: 0.75rem; border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald);" onclick="event.stopPropagation(); openDetailModal(${item.id}, 'referral')">
               ✉ Referral
             </button>
           ` : ''}
@@ -553,18 +553,18 @@ async function openDetailModal(appId, initialMode = 'rewritten') {
 
     const referralWrap = document.getElementById('modal-referral-wrap');
     const btnReferralTab = document.getElementById('btn-doc-referral');
-    if (record.referral_message) {
-      referralWrap.style.display = 'block';
+    const hasReferral = Boolean(record.referral_message && record.referral_message.trim());
+    if (hasReferral) {
       document.getElementById('modal-referral-message').textContent = record.referral_message;
       if (btnReferralTab) btnReferralTab.style.display = 'inline-block';
     } else {
-      referralWrap.style.display = 'none';
+      if (referralWrap) referralWrap.style.display = 'none';
       if (btnReferralTab) btnReferralTab.style.display = 'none';
     }
 
     // Default to requested mode (fallback to rewritten if referral requested but not available)
-    const targetMode = (initialMode === 'referral' && record.referral_message) ? 'referral' : 'rewritten';
-    switchDocMode(targetMode);
+    const targetMode = (initialMode === 'referral' && hasReferral) ? 'referral' : 'rewritten';
+    await switchDocMode(targetMode);
 
   } catch (err) {
     showToast(`Error opening modal: ${err.message}`, 'error');
@@ -591,11 +591,13 @@ async function switchDocMode(mode) {
 
   const singleViewer = document.getElementById('doc-viewer-single');
   const diffViewer = document.getElementById('doc-viewer-diff');
+  const referralWrap = document.getElementById('modal-referral-wrap');
 
   if (!state.activeDetail) return;
   const appId = state.activeDetail.id;
 
   if (mode === 'referral') {
+    if (referralWrap) referralWrap.style.display = 'none';
     singleViewer.style.display = 'block';
     diffViewer.style.display = 'none';
 
@@ -630,12 +632,14 @@ async function switchDocMode(mode) {
   }
 
   if (mode === 'diff') {
+    if (referralWrap && state.activeDetail.referral_message) referralWrap.style.display = 'block';
     singleViewer.style.display = 'none';
     diffViewer.style.display = 'grid';
     await renderDiffView(appId);
     return;
   }
 
+  if (referralWrap && state.activeDetail.referral_message) referralWrap.style.display = 'block';
   singleViewer.style.display = 'block';
   diffViewer.style.display = 'none';
 
@@ -727,6 +731,42 @@ async function renderDiffView(appId) {
   }
 }
 
+function copyToClipboard(text, successMsg = 'Copied to clipboard!') {
+  if (!text || !text.trim()) {
+    showToast('Nothing to copy.', 'info');
+    return;
+  }
+  const clean = text.trim();
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(clean)
+      .then(() => showToast(successMsg, 'success'))
+      .catch(() => fallbackCopy(clean, successMsg));
+  } else {
+    fallbackCopy(clean, successMsg);
+  }
+}
+
+function fallbackCopy(text, successMsg) {
+  try {
+    const el = document.createElement('textarea');
+    el.value = text;
+    el.setAttribute('readonly', '');
+    el.style.position = 'absolute';
+    el.style.left = '-9999px';
+    document.body.appendChild(el);
+    el.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(el);
+    if (ok) {
+      showToast(successMsg, 'success');
+    } else {
+      showToast('Unable to copy text.', 'error');
+    }
+  } catch (err) {
+    showToast('Copy failed.', 'error');
+  }
+}
+
 function copyActiveDocument() {
   if (state.activeDocMode === 'referral') {
     copyReferralMessage();
@@ -735,8 +775,7 @@ function copyActiveDocument() {
   const docType = state.activeDocMode === 'source' ? 'source' : 'rewritten';
   const cached = state.docCache[docType];
   if (cached && cached.content) {
-    navigator.clipboard.writeText(cached.content);
-    showToast('Markdown copied to clipboard!', 'success');
+    copyToClipboard(cached.content, 'Markdown copied to clipboard!');
   } else {
     showToast('No markdown text to copy.', 'info');
   }
@@ -745,12 +784,7 @@ function copyActiveDocument() {
 function copyReferralMessage() {
   const msg = (state.activeDetail && state.activeDetail.referral_message) ||
               document.getElementById('modal-referral-message').textContent;
-  if (msg && msg.trim()) {
-    navigator.clipboard.writeText(msg.trim());
-    showToast('Referral message copied to clipboard!', 'success');
-  } else {
-    showToast('No referral message to copy.', 'info');
-  }
+  copyToClipboard(msg, 'Referral message copied to clipboard!');
 }
 
 // --- Settings & Configuration Drawer ---
