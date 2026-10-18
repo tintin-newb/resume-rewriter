@@ -59,12 +59,7 @@ console = Console()
     default=False,
     help="Force re-execution even if the job posting was already processed in the database."
 )
-@click.option(
-    "--min-score",
-    type=float,
-    default=None,
-    help=f"Minimum target score to exit loop (default: {settings.MIN_MATCH_SCORE})."
-)
+
 @click.option(
     "--max-loops",
     type=int,
@@ -91,7 +86,6 @@ def run_cli(
     url: Optional[str],
     jd_file: Optional[Path],
     force: bool,
-    min_score: Optional[float],
     max_loops: Optional[int],
     instructions: Optional[str],
     skip_bootstrap: bool
@@ -169,7 +163,6 @@ def run_cli(
         sys.exit(1)
 
     # --- 5. State Initialization ---
-    target_min_score = min_score if min_score is not None else settings.MIN_MATCH_SCORE
     target_max_loops = max_loops if max_loops is not None else settings.MAX_LOOPS
 
      # --- 6. Parse Auxiliary Instructions (File or Raw String) ---

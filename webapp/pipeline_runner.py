@@ -64,7 +64,6 @@ async def run_pipeline_job(task: PipelineTask):
     jd_text = p.get("jd_text")
     force = bool(p.get("force", False))
     max_loops = int(p.get("max_loops") or settings.MAX_LOOPS)
-    min_score = float(p.get("min_score") or settings.MIN_MATCH_SCORE)
     skip_bootstrap = bool(p.get("skip_bootstrap", False))
     source_resume_path = p.get("source_resume_path")
 

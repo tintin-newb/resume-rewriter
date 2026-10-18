@@ -202,11 +202,7 @@ POSTGRES_USER=postgres
 POSTGRES_PASSWORD=postgres
 
 # Optimization Loop Guardrails
-MIN_MATCH_SCORE=8.0
 MAX_LOOPS=3
-
-# Default File Paths
-OUTPUT_DIR=output/
 ```
 
 | Variable | Description |
@@ -214,9 +210,7 @@ OUTPUT_DIR=output/
 | `OLLAMA_BASE_URL` | Endpoint of the Ollama server (native or container). |
 | `OLLAMA_MODEL` | Local LLM tag (e.g., `qwen2.5:7b`, `qwen2.5:14b`). |
 | `POSTGRES_*` | Connection credentials for the application database. |
-| `MIN_MATCH_SCORE` | Score (1.0 to 10.0) that satisfies the loop and triggers the referral agent. |
 | `MAX_LOOPS` | Circuit breaker limit preventing infinite optimizer iterations. |
-| `OUTPUT_DIR` | Directory where optimized Markdown resumes are saved. |
 
 ---
 
