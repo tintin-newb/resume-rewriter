@@ -70,7 +70,7 @@ resume_rewriter/
 - **`db/`**: Handles database interactions. `schema.sql` manages table creation with columns for `source_resume_path` and `recruiter_verdict`. `operations.py` manages deduplication checks, cursor-based history pagination, and application state updates.
 - **`docker/`**: Contains containerization and deployment assets. `Dockerfile` packages the application on a slim Python 3.10 runtime with Playwright Chromium; `docker-compose.yml` orchestrates the web dashboard alongside a GPU-accelerated Ollama container; and `build.sh` automates image compilation.
 - **`parsers/`**: An extensible document extraction suite. `resume_parser.py` extracts text from `.pdf`, `.md`, and `.txt` files.
-- **`scrapers/jd_scraper.py`**: Uses `Crawl4AI` (headless Chromium) to render JavaScript-heavy ATS sites (Greenhouse, Lever, Workday) and `BeautifulSoup` to strip boilerplate (DOM headers, footers, scripts).
+- **`scrapers/jd_scraper.py`**: Robust crawler built on `Crawl4AI` (headless Chromium) and `BeautifulSoup`. Features automatic extraction of structured `JobPosting` schema (`application/ld+json`), SPA render delay support, and heuristic DOM fallback to handle modern ATS platforms (Workday, Phenom People, Greenhouse, Lever).
 - **`agents/`**: Contains the core intelligence:
   - `state.py`: Defines the typed payload passed through the agent graph.
   - `recruiter.py`, `rewriter.py`, `referral.py`: Individual nodes encapsulating prompts and structured outputs.
@@ -279,23 +279,28 @@ If any system is unreachable or uninitialized, the diagnostic table will highlig
 #### Command Line Options
 ```text
 Options:
-  -r, --resume PATH    Path to base candidate resume (.pdf, .md, .txt, or
-                       .docx).  [required]
-  -c, --company TEXT   Name of the hiring company (e.g., 'Stripe').
-                       [required]
-  -j, --job-id TEXT    Unique requisition ID or code (e.g., 'ENG-4021').
-                       [required]
-  --role TEXT          Target job title (e.g., 'Senior Backend Engineer').
-                       [required]
-  -u, --url TEXT       Public URL to the job posting (scraped via Crawl4AI).
-  --jd-file PATH       Local path to a text/markdown file containing the JD.
-  -f, --force          Force re-execution even if the job posting was already
-                       processed in the database.
-  --min-score FLOAT    Minimum target score to exit loop (default: 8.0).
-  --max-loops INTEGER  Maximum rewriter iterations (default: 3).
-  --skip-bootstrap     Skip pre-flight health checks for Ollama and
-                       PostgreSQL.
-  --help               Show this message and exit.
+  -r, --resume PATH        Path to base candidate resume (.pdf, .md, .txt, or
+                           .docx).  [required]
+  -c, --company TEXT       Name of the hiring company (e.g., 'Stripe').
+                           [required]
+  -j, --job-id TEXT        Unique requisition ID or code (e.g., 'ENG-4021').
+                           [required]
+  --role TEXT              Target job title (e.g., 'Senior Backend Engineer').
+                           [required]
+  -u, --url TEXT           Public URL to the job posting (scraped via
+                           Crawl4AI).
+  --jd-file PATH           Local path to a text/markdown file containing the
+                           JD.
+  -f, --force              Force re-execution even if the job posting was
+                           already processed in the database.
+  --min-score FLOAT        Minimum target score to exit loop (default: 8.0).
+  --max-loops INTEGER      Maximum rewriter iterations (default: 3).
+  --skip-bootstrap         Skip pre-flight health checks for Ollama and
+                           PostgreSQL.
+  -i, --instructions TEXT  Auxiliary instructions/guidance for Recruiter
+                           evaluation and Re-writer tailoring (accepts a
+                           string or path to a .txt file).
+  --help                   Show this message and exit.
 ```
 
 ---
@@ -347,6 +352,18 @@ python run_cli.py \
   --force
 ```
 
+#### Scenario D: Providing Auxiliary Guidance & Tone Instructions
+Provide custom focus areas, role-specific nuances, or tone directives (as an inline string or path to a `.txt` file):
+```bash
+python run_cli.py \
+  --resume "data/my_base_resume.pdf" \
+  --company "Adobe" \
+  --job-id "R171487" \
+  --role "Machine Learning Engineer" \
+  --url "https://careers.adobe.com/us/en/job/ADOBUSR171487EXTERNALENUS/Machine-Learning-Engineer-3" \
+  --instructions "Prioritize transformer model training and distributed PyTorch pipelines; emphasize production ML engineering rather than research."
+```
+
 ---
 
 ## 5. Output Artifacts
@@ -374,7 +391,8 @@ Open **[http://localhost:8000](http://localhost:8000)** in your browser.
 * **Tab 1: Generate Resume (Live Pipeline Stream):**
   * Drag & drop candidate base resume (`.pdf`, `.md`, `.txt`, `.docx`) — automatically saved to `~/.resume-rewriter/uploads/` for side-by-side version comparison.
   * Enter Target Company, Requisition ID, and Target Role.
-  * Ingest Job Description via **URL Web Scrape** (Crawl4AI) or **Direct Text / Paste**.
+  * Ingest Job Description via **URL Web Scrape** (Crawl4AI with JSON-LD schema parsing and SPA render delays) or **Direct Text / Paste**.
+  * **Auxiliary Instructions / Guidance (Optional):** Stateless per-run guidance to steer the Recruiter evaluation criteria and Re-writer optimization (e.g. tone directives, technical focus, or specific experience to emphasize).
   * Real-time Server-Sent Events (SSE) stepper reflecting each stage of the LangGraph agent pipeline: Pre-flight Bootstrap, Cache Verification, Content Ingestion, Recruiter Audit rounds (with Match Tier badge, strengths, gaps, and verdict), Re-writer Optimization passes, Referral Outreach, and Artifact saving.
 * **Tab 2: History (Interactive Run Archive):**
   * **Fully Independent:** Switching between tabs does not disrupt an ongoing generation task.

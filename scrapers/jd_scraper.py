@@ -7,8 +7,9 @@ from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
 
 class JDScraper:
     """
-    Asynchronously crawls dynamic job postings using Crawl4AI 
-    and sanitizes HTML content with BeautifulSoup.
+    Asynchronously crawls dynamic job postings using Crawl4AI and extracts
+    structured job content via JSON-LD schema (JobPosting) or BeautifulSoup sanitization.
+    Supports modern single-page applications (SPAs) with render delays and content validation.
     """
 
     def __init__(self):
