@@ -1,4 +1,3 @@
-# agents/rewriter.py
 from typing import List, Dict, Any
 from pydantic import BaseModel, Field
 from langchain_ollama import ChatOllama

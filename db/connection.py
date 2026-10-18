@@ -1,4 +1,3 @@
-# db/connection.py
 from contextlib import contextmanager
 from typing import Generator
 import psycopg

@@ -1,4 +1,3 @@
-# config/action_verbs.py
 from typing import Dict, List
 
 ACTION_VERBS_CATALOG: Dict[str, List[str]] = {
