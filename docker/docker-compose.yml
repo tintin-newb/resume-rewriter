@@ -1,0 +1,31 @@
+services:
+  web:
+    image: resume-rewriter:latest
+    container_name: resume-rewriter
+    restart: always
+    ports:
+      - "8000:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ~/.resume-rewriter:/root/.resume-rewriter
+    entrypoint: ["python3", "run_gui.py"]
+
+  ollama_gpu:
+    image: ollama/ollama
+    container_name: ollama_gpu
+    restart: always
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_storage:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+volumes:
+  ollama_storage:
