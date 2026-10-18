@@ -1,4 +1,3 @@
-# run_cli.py
 import sys
 from pathlib import Path
 from typing import Optional

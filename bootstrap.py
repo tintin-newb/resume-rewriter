@@ -1,4 +1,3 @@
-# bootstrap.py
 import sys
 import ollama
 from rich.console import Console

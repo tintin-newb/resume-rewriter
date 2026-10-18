@@ -1,4 +1,3 @@
-# agents/state.py
 from typing import TypedDict, List, Optional
 
 

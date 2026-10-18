@@ -1,4 +1,3 @@
-# scrapers/jd_scraper.py
 import asyncio
 import re
 from typing import Optional

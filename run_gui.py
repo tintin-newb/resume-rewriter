@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# run_gui.py
 """
 Launcher script for Agentic Resume Rewriter Web UI.
 Starts FastAPI backend with Uvicorn and opens the web application.

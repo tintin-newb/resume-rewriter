@@ -1,4 +1,3 @@
-# db/operations.py
 from typing import Optional, Dict, Any
 from db.connection import get_db_connection
 

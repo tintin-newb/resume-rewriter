@@ -29,6 +29,10 @@ resume_rewriter/
 │   ├── schema.sql               # PostgreSQL DDL schema definition
 │   ├── connection.py            # Database client and connection verification
 │   └── operations.py            # Read/write queries, caching, history pagination, and state persistence
+├── docker/                      # Containerization and multi-container deployment
+│   ├── Dockerfile               # Slim Python 3.10 runtime with Playwright Chromium
+│   ├── docker-compose.yml       # Orchestrates web app and GPU-accelerated Ollama
+│   └── build.sh                 # Build script to generate container image
 ├── parsers/
 │   ├── __init__.py
 │   ├── base.py                  # Abstract Base Class for document parsing (BaseDocumentParser)
@@ -56,6 +60,7 @@ resume_rewriter/
 ├── run_gui.py                    # Root entry point to launch the interactive Web UI
 ├── run_cli.py                      # Click-based CLI entry point
 ├── requirements.txt             # Project dependencies
+├── .dockerignore                # Build context allowlist filter
 ├── .env.example                 # Template environment variables
 └── README.md                    # Project documentation
 ```
@@ -63,6 +68,7 @@ resume_rewriter/
 ### Module Descriptions
 - **`config/settings.py`**: Centralizes configuration (database URLs, Ollama endpoint, default loop limits, and score thresholds) via `pydantic-settings`. Prioritizes user configuration in `~/.resume-rewriter/config.env` and supports hot-reloading.
 - **`db/`**: Handles database interactions. `schema.sql` manages table creation with columns for `source_resume_path` and `recruiter_verdict`. `operations.py` manages deduplication checks, cursor-based history pagination, and application state updates.
+- **`docker/`**: Contains containerization and deployment assets. `Dockerfile` packages the application on a slim Python 3.10 runtime with Playwright Chromium; `docker-compose.yml` orchestrates the web dashboard alongside a GPU-accelerated Ollama container; and `build.sh` automates image compilation.
 - **`parsers/`**: An extensible document extraction suite. `resume_parser.py` extracts text from `.pdf`, `.md`, and `.txt` files.
 - **`scrapers/jd_scraper.py`**: Uses `Crawl4AI` (headless Chromium) to render JavaScript-heavy ATS sites (Greenhouse, Lever, Workday) and `BeautifulSoup` to strip boilerplate (DOM headers, footers, scripts).
 - **`agents/`**: Contains the core intelligence:
@@ -211,6 +217,49 @@ OUTPUT_DIR=output/
 | `MIN_MATCH_SCORE` | Score (1.0 to 10.0) that satisfies the loop and triggers the referral agent. |
 | `MAX_LOOPS` | Circuit breaker limit preventing infinite optimizer iterations. |
 | `OUTPUT_DIR` | Directory where optimized Markdown resumes are saved. |
+
+---
+
+### 3.5. Docker Build & Deployment
+
+As an alternative to native local Python setup, you can build and run the application and its LLM backend using Docker and Docker Compose.
+
+#### 1. Build the Application Image
+The container uses `python:3.10-slim` and installs all project requirements along with Playwright Chromium for web scraping. Run `build.sh` from the `docker/` directory:
+
+```bash
+cd docker
+./build.sh
+```
+This builds and tags the image as `resume-rewriter:latest` using the repository root as the build context.
+
+#### 2. Deploy with Docker Compose
+Deploy both the Web UI and the Ollama service with NVIDIA GPU support:
+
+```bash
+# From the docker/ directory
+docker compose up -d
+```
+*(Or from the repository root: `docker compose -f docker/docker-compose.yml up -d`)*
+
+#### Services in `docker-compose.yml`:
+* **`web`**: Runs `run_gui.py` on port `8000`. Maps `host.docker.internal` to `host-gateway` so the container can communicate with services running on the host machine. Mounts `~/.resume-rewriter` to `/root/.resume-rewriter` to persist uploaded resumes and user settings.
+* **`ollama_gpu`**: Runs the official `ollama/ollama` image with NVIDIA GPU acceleration (`--gpus all`) on port `11434`, storing models persistently in the `ollama_storage` volume.
+
+#### 3. Pull Model in Containerized Ollama
+If using the containerized `ollama_gpu` service, pull your preferred model once the container is running:
+```bash
+docker exec -it ollama_gpu ollama pull qwen2.5:7b
+```
+
+#### 4. Access the Web Dashboard
+Open **[http://localhost:8000](http://localhost:8000)** in your browser.
+
+#### 5. Stop the Containers
+```bash
+# From the docker/ directory
+docker compose down
+```
 
 ---
 
