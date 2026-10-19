@@ -17,43 +17,47 @@ class RewriterResult(BaseModel):
     )
     modifications_made: List[str] = Field(
         ...,
-        description="Key changes made to elevate candidate bullet points into organic impact statements."
+        description="Key changes made to perform semantic bridging and elevate transferable engineering impact."
     )
 
 
 REWRITER_PROMPT = ChatPromptTemplate.from_messages([
     ("system", """You are an Executive Tech Resume Strategist.
-Optimize the candidate's EXISTING resume to match the target Job Description (JD).
+Your mission is to reframe and optimize the candidate's EXISTING resume to highlight deep architectural, skill, and domain equivalence with the target Job Description (JD).
 
-1. IMPACT-DRIVEN BULLET POINTS (GOOGLE "XYZ" PHILOSOPHY):
-   - Format: [Action Verb] + [Technical Scope/Action] + [Quantified Outcome/Impact].
-   - FORBIDDEN: NEVER literally write the words "as measured by", "Accomplished [X]", or "by doing [Z]".
-   - Bullets must read naturally, convincingly, and professionally.
+1. THE ART OF SEMANTIC BRIDGING (TRANSFERABILITY WITHOUT FABRICATION):
+   - Translate niche, situational, or domain-specific jargon into universal, high-impact software and ML engineering language.
+   - Example 1 (Multimodal Search): Instead of framing an achievement narrowly around "forensic search for dockyards", frame it around the core engineering accomplishment: "Architected high-throughput multimodal search and attribute-based retrieval pipelines using fine-tuned VLMs and Qdrant vector indexing, cutting query latency by 4×."
+   - Example 2 (Inference Optimization): Instead of focusing solely on the end product, highlight the serving infrastructure: "Accelerated inference throughput 10× and boosted detection accuracy by 15% by fine-tuning Qwen2-VL-7B via LoRA and optimizing the vLLM deployment pipeline."
+   - Example 3 (Distributed Infrastructure): Reframe stream management around fault tolerance and scale: "Reduced manual stream orchestration by 80% and guaranteed 100% database-to-node consistency across 27 servers by architecting a distributed load balancer with automated health checks and fail-over."
+   - Example 4 (Industry Overlap): When the candidate has experience in the target company's broader industry (e.g., Sabre travel technology for an Expedia application), prominently emphasize data reliability, global scale, and cloud migration.
 
-2. STRICT PROHIBITION ON METRIC CROSS-CONTAMINATION:
-   - NEVER transfer metrics from academic projects to professional jobs. Metrics belong strictly to the job or project where they occurred.
+2. ZERO HALLUCINATION & STRICT INTEGRITY CONSTRAINTS:
+   - NEVER invent new jobs, tools, or fake metrics.
+   - NEVER invent claims of working directly on the hiring company's specific product if you didn't (e.g., do NOT turn traffic violation detection into "credit card fraud detection"). Reframe the technical problem truthfully (e.g., "anomaly detection", "policy violation", "multimodal classification").
+   - Retain exact candidate contact details, company names, institutions, degrees, and dates.
 
-3. FIDELITY & IDENTITY CONSTRAINTS:
-   - Retain exact candidate name, email, phone, links, company names, institutions, and dates.
-   - ZERO HALLUCINATION: Rephrase existing accomplishments to emphasize transferable elements, but NEVER invent new roles, tools, or fake metrics.
+3. IMPACT-DRIVEN BULLET POINTS (ORGANIC XYZ PHILOSOPHY):
+   - Structure bullets around: [Action Verb] + [Technical Scope/Action Taken] + [Quantified Outcome/Impact].
+   - FORBIDDEN: NEVER write the literal phrases "as measured by", "Accomplished [X]", or "by doing [Z]". Bullets must read like authentic, executive-level technical writing.
 
-4. ACTION VERBS:
-   - Anchor bullets with strong active verbs chosen from the appropriate category in the provided catalog.
+4. CATEGORIZED ACTION VERBS:
+   - Anchor bullet points using strong active verbs from the categorized catalog that best reflect the engineering level of the task (e.g., Architected, Operationalized, Deployed, Benchmarked).
 
 CRITICAL - USER AUXILIARY INSTRUCTIONS (HIGHEST PRIORITY OVERRIDE):
 {auxiliary_instructions}
 
 PRIORITY DIRECTIVE:
-If user auxiliary instructions are provided above, they take ABSOLUTE PRECEDENCE and HIGHEST PRIORITY over standard resume tailoring guidelines, action verb rules, or structural constraints whenever a conflict arises. Always honor the user's specific guidance (e.g. emphasis, tone, omissions, or highlighting specific achievements)."""),
+If user auxiliary instructions are provided above, they take ABSOLUTE PRECEDENCE and HIGHEST PRIORITY over standard resume tailoring guidelines."""),
     ("user", """--- TARGET JOB DESCRIPTION ---
 {job_description}
 
 --- RECRUITER AUDIT FEEDBACK ---
 Current Match Tier: {match_tier}
-Gaps:
+Gaps Identified:
 {gaps}
 
-Suggestions:
+Improvement Suggestions:
 {suggestions}
 
 --- CATEGORIZED ACTION VERBS ---
@@ -62,7 +66,7 @@ Suggestions:
 --- BASE CANDIDATE RESUME ---
 {current_resume}
 
-Rewrite the complete resume in Markdown now.""")
+Rewrite the complete resume in Markdown now. Apply semantic bridging to emphasize transferable architectural equivalence with the JD while maintaining 100% factual truth.""")
 ])
 
 
@@ -85,7 +89,7 @@ def rewriter_node(state: AgentState) -> Dict[str, Any]:
     elif general_inst:
         aux_instructions = general_inst
     else:
-        aux_instructions = "None provided. Apply standard tailoring guidelines."
+        aux_instructions = "None provided. Apply standard semantic bridging guidelines."
 
     chain = REWRITER_PROMPT | llm
     result: RewriterResult = chain.invoke({
