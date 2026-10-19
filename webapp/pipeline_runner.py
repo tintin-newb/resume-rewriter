@@ -188,6 +188,9 @@ async def run_pipeline_job(task: PipelineTask):
 
         # Step 4: State Initialization
         auxiliary_instructions = (task.payload.get("auxiliary_instructions") or "").strip()
+        recruiter_instructions = (task.payload.get("recruiter_instructions") or "").strip()
+        rewriter_instructions = (task.payload.get("rewriter_instructions") or "").strip()
+        referral_instructions = (task.payload.get("referral_instructions") or "").strip()
 
         initial_state: AgentState = {
             "company": company,
@@ -198,6 +201,9 @@ async def run_pipeline_job(task: PipelineTask):
             "base_resume": base_resume_text,
             "current_resume": base_resume_text,
             "auxiliary_instructions": auxiliary_instructions or None,
+            "recruiter_instructions": recruiter_instructions or None,
+            "rewriter_instructions": rewriter_instructions or None,
+            "referral_instructions": referral_instructions or None,
             "iteration": 1,
             "max_loops": max_loops,
             "match_tier": "Pending",

@@ -133,6 +133,30 @@ function toggleAccordion(id) {
   arrow.textContent = isOpen ? '▲' : '▼';
 }
 
+// --- Agent Guidance Tabs & Indicators ---
+function setAuxAgentMode(agent) {
+  const modes = ['recruiter', 'rewriter', 'referral', 'general'];
+  modes.forEach(m => {
+    const btn = document.getElementById(`btn-aux-${m}`);
+    const panel = document.getElementById(`aux-panel-${m}`);
+    if (btn) btn.classList.toggle('active', m === agent);
+    if (panel) panel.style.display = (m === agent) ? 'block' : 'none';
+  });
+}
+window.setAuxAgentMode = setAuxAgentMode;
+
+function updateAuxIndicators() {
+  const modes = ['recruiter', 'rewriter', 'referral', 'general'];
+  modes.forEach(m => {
+    const input = document.getElementById(`input-aux-${m}`);
+    const dot = document.getElementById(`dot-aux-${m}`);
+    if (input && dot) {
+      dot.style.display = input.value.trim().length > 0 ? 'inline-block' : 'none';
+    }
+  });
+}
+window.updateAuxIndicators = updateAuxIndicators;
+
 // --- Pipeline Execution & Live Stepper ---
 async function handleGenerateSubmit(e) {
   e.preventDefault();
@@ -147,8 +171,12 @@ async function handleGenerateSubmit(e) {
   const role = document.getElementById('input-role').value.trim();
   const url = document.getElementById('input-jd-url').value.trim();
   const jdText = document.getElementById('input-jd-text').value.trim();
-  const auxInstructionsEl = document.getElementById('input-auxiliary-instructions');
-  const auxiliaryInstructions = auxInstructionsEl ? auxInstructionsEl.value.trim() : '';
+
+  const recruiterInst = document.getElementById('input-aux-recruiter')?.value.trim() || '';
+  const rewriterInst = document.getElementById('input-aux-rewriter')?.value.trim() || '';
+  const referralInst = document.getElementById('input-aux-referral')?.value.trim() || '';
+  const generalInst = (document.getElementById('input-aux-general')?.value || document.getElementById('input-auxiliary-instructions')?.value || '').trim();
+
   const maxLoops = document.getElementById('input-max-loops').value;
   const force = document.getElementById('check-force').checked;
   const skipBootstrap = document.getElementById('check-skip-bootstrap').checked;
@@ -169,7 +197,10 @@ async function handleGenerateSubmit(e) {
   formData.append('role', role);
   if (state.jdMode === 'url') formData.append('url', url);
   if (state.jdMode === 'text') formData.append('jd_text', jdText);
-  if (auxiliaryInstructions) formData.append('auxiliary_instructions', auxiliaryInstructions);
+  if (recruiterInst) formData.append('recruiter_instructions', recruiterInst);
+  if (rewriterInst) formData.append('rewriter_instructions', rewriterInst);
+  if (referralInst) formData.append('referral_instructions', referralInst);
+  if (generalInst) formData.append('auxiliary_instructions', generalInst);
   if (maxLoops) formData.append('max_loops', maxLoops);
   formData.append('force', force);
   formData.append('skip_bootstrap', skipBootstrap);
