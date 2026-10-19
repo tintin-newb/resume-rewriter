@@ -94,6 +94,8 @@ flowchart TD
 
 ### Tech Stack & System Specifications
 
+> These are specs on which the application has been built and tested.
+
 #### Technology Stack & Versions
 | Category | Component / Library | Version | Purpose |
 | :--- | :--- | :--- | :--- |
