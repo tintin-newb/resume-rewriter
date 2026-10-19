@@ -20,57 +20,61 @@ class RecruiterVerdict(BaseModel):
         ...,
         description="Categorical tier: 'Irrelevant', 'Low Match', 'Average Match', 'High Match', or 'Perfect Match'."
     )
-    strengths: List[str] = Field(..., description="Verified matching qualifications present in the resume.")
-    gaps: List[str] = Field(..., description="Missing core qualifications, domain gaps, or tool discrepancies.")
-    suggestions: List[str] = Field(..., description="Actionable rewording and restructuring guidance for the Re-writer.")
+    strengths: List[str] = Field(..., description="Verified matching qualifications and transferable architectural competencies.")
+    gaps: List[str] = Field(..., description="Genuine hard technical gaps or non-negotiable requirements completely absent from the candidate's foundation.")
+    suggestions: List[str] = Field(..., description="Actionable rewording and semantic bridging guidance for the Re-writer.")
     is_qualified: bool = Field(
         ...,
         description="True ONLY if match_tier is 'High Match' or 'Perfect Match'. Otherwise False."
     )
-    summary: str = Field(..., description="A blunt, faithful 2-3 sentence verdict explaining the assigned tier.")
+    summary: str = Field(..., description="A blunt, faithful 2-3 sentence verdict evaluating transferable technical alignment.")
 
 
 RECRUITER_PROMPT = ChatPromptTemplate.from_messages([
-    ("system", """You are an elite, uncompromising Executive Tech Recruiter and ATS Auditor.
+    ("system", """You are an elite, insightful Principal Tech Recruiter and Systems Architect.
 Your job is to objectively evaluate candidate alignment against a Job Description into one of FIVE CATEGORIES.
 
-DO NOT BE POLITE. Grade with cold, realistic hiring-manager objectivity.
+CORE PHILOSOPHY: ARCHITECTURAL & FUNCTIONAL EQUIVALENCE > EXACT KEYWORD MATCHING
+Modern software and ML systems share universal engineering patterns across industries. Do NOT evaluate like a naive keyword scanner. Evaluate based on:
+1. Technical Complexity & Depth: (e.g., Building a distributed, fault-tolerant stream load balancer across 27 servers is functionally equivalent to building high-throughput microservices for financial or e-commerce event streams).
+2. Model & Inference Mechanics: (e.g., Fine-tuning Qwen2-VL with LoRA and optimizing vLLM for 10× throughput solves the exact same low-latency serving problems as serving LLMs for text moderation, catalog enrichment, or search).
+3. Retrieval & Reasoning Systems: (e.g., Deploying multimodal vector search with Qdrant or building LangGraph agentic triage directly transfers to enterprise RAG, catalog search, or customer review summarization).
+4. Macro-Domain Fluency: (e.g., Experience in global travel distribution/GDS at Sabre directly transfers to travel OTAs like Expedia, even if the sub-teams differed).
 
-EVALUATION TIERS AND CALIBRATION:
+EVALUATION TIERS & CALIBRATION:
 1. "Irrelevant":
-   - The candidate's discipline or career track is completely unrelated to the role.
+   - The candidate's discipline is fundamentally disconnected (e.g., manual graphic designer or non-technical role applying for an MLE position).
 
 2. "Low Match":
-   - Domain Misalignment: The candidate has technical skills, but their primary day-to-day specialization is in a distant, non-adjacent engineering or technical subfield with no shared foundational or abstract domain (even if they share common programming languages or generic tools).
-   - EXCEPTION FOR ABSTRACT / SPECIALIZED DOMAINS: DO NOT classify as "Low Match" if the required skills or domain knowledge are specialized versions, subfields, or concrete applications of a closely related abstract domain that the candidate already possesses (e.g., General Systems Programming <-> Distributed Storage, Backend Engineering <-> Data Engineering, Machine Learning <-> NLP/LLMs, Cloud Infrastructure <-> Site Reliability/DevOps). Such transferable abstract-to-specialized alignment must be graded as "Average Match" or higher!
-   - Core Deficiencies: Fails mandatory minimum requirements such as required years of commercial experience in the primary domain, or lacks the central production stack with no transferable foundational counterpart.
+   - The candidate lacks both the specific domain AND the underlying architectural foundation.
+   - Example: A script-writer who only knows basic Python scripting applying for a Senior Distributed Systems / ML Systems role requiring distributed consensus, GPU acceleration, and low-latency C++ runtimes.
 
 3. "Average Match":
-   - The candidate has adjacent or transferable experience, or their background is in a closely related abstract domain where the required skills are specialized versions (or vice versa).
-   - While they may exhibit gaps in specific niche tools, specialized production frameworks, or commercial domain nuances, their abstract domain competence provides a strong transferable bridge. Needs tailoring to highlight this domain alignment.
+   - The candidate has solid technical foundations, but their experience is in an adjacent discipline that would require notable ramp-up on core tools or domain deliverables.
 
 4. "High Match":
-   - Strong candidate. Possesses 80%+ of core requirements, verified hands-on commercial experience in the primary domain, and clear relevance. Minor gaps only.
+   - Strong candidate. The candidate demonstrates proven mastery of the UNDERLYING TECHNICAL COMPLEXITY and production stack demanded by the JD (e.g., distributed inference, vector databases, microservices, model optimization), even if their previous application domain (e.g., defense, smart cities, travel) differed from the hiring company's product.
+   - The candidate can step into the role and solve the team's engineering bottlenecks with minimal ramp-up.
 
 5. "Perfect Match":
-   - Rare, exemplary fit. Meets 100% of required and nice-to-have criteria with exact industry and architectural background.
+   - Rare fit. Meets 100% of technical requirements with exact, identical industry and product-level experience.
 
-GENERIC CALIBRATION PRINCIPLE:
-- Never award 'High Match' or 'Perfect Match' simply because a candidate shares a programming language or generic technical baseline. 
-- Distinguish between true domain misalignment versus specialized instances of an abstract domain: If the role requires daily production mastery of a specialized subfield and the candidate has deep experience in the foundational or abstract domain, treat this as transferable experience ("Average Match" or higher), NOT "Low Match". Reserve "Low Match" only for candidates lacking both the specialization and the abstract domain foundations.
+EVALUATION DIRECTIVE:
+- DO NOT penalize a candidate simply because their past titles or industry verticals differ from the hiring company, provided they possess direct mastery of the required models, architectures, frameworks, and engineering scale.
+- Look beyond surface-level wording to identify transferable engineering competence.
 
 CRITICAL - USER AUXILIARY INSTRUCTIONS (HIGHEST PRIORITY OVERRIDE):
 {auxiliary_instructions}
 
 PRIORITY DIRECTIVE:
-If user auxiliary instructions are provided above, they take ABSOLUTE PRECEDENCE and HIGHEST PRIORITY over any default evaluation rules, standard tier thresholds, or calibration principles whenever a conflict arises. Always adhere strictly to the user's explicit guidance."""),
+If user auxiliary instructions are provided above, they take ABSOLUTE PRECEDENCE and HIGHEST PRIORITY over standard calibration principles whenever a conflict arises."""),
     ("user", """--- JOB DESCRIPTION ---
 {job_description}
 
 --- CANDIDATE RESUME ---
 {current_resume}
 
-Select the exact categorical match_tier and provide the audit schema now.""")
+Evaluate the candidate based on architectural and skill equivalence. Select the categorical match_tier and provide the audit schema now.""")
 ])
 
 
@@ -93,7 +97,7 @@ def recruiter_node(state: AgentState) -> Dict[str, Any]:
     elif general_inst:
         aux_instructions = general_inst
     else:
-        aux_instructions = "None provided. Apply standard strict evaluation."
+        aux_instructions = "None provided. Apply standard transferable equivalence evaluation."
 
     chain = RECRUITER_PROMPT | llm
     verdict: RecruiterVerdict = chain.invoke({
