@@ -275,12 +275,13 @@ async def run_pipeline_job(task: PipelineTask):
                         })
 
                     elif node_name == "rewriter":
+                        round_num = max(1, final_state.get("iteration", 2) - 1)
                         await task.emit("step", {
                             "step": "rewriter",
-                            "title": f"Re-writer Optimization Pass (Round {final_state.get('iteration', 1)})",
+                            "title": f"Re-writer Optimization Pass (Round {round_num})",
                             "status": "completed",
                             "data": {
-                                "round": final_state.get("iteration", 1),
+                                "round": round_num,
                                 "modifications_made": node_output.get("modifications_made", [])
                             }
                         })

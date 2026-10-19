@@ -263,11 +263,12 @@ def run_cli(
             elif node_name == "rewriter":
                 mods = node_output.get("modifications_made", [])
                 mods_text = "\n".join(f"  • {m}" for m in mods[:4]) if mods else "  • Re-anchored accomplishments using categorized action verbs."
+                round_num = max(1, final_state["iteration"] - 1)
 
                 console.print(Panel(
                     f"[bold cyan]Action words integrated & accomplishments rewritten:[/bold cyan]\n{mods_text}\n\n"
-                    f"[dim]Updated resume drafted. Handing off to Recruiter for re-evaluation (Round {final_state['iteration']})...[/dim]",
-                    title="[bold cyan]Node: Re-writer Optimization Pass[/bold cyan]",
+                    f"[dim]Altered resume generated (Pass {round_num}/{final_state['max_loops']}). Evaluating next pipeline step...[/dim]",
+                    title=f"[bold cyan]Node: Re-writer Optimization Pass (Round {round_num})[/bold cyan]",
                     border_style="cyan"
                 ))
 
