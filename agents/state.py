@@ -13,8 +13,11 @@ class AgentState(TypedDict):
     base_resume: str
     current_resume: str
 
-    # User Auxiliary Guidance
+    # User Auxiliary Guidance (General & Agent-Specific)
     auxiliary_instructions: Optional[str]
+    recruiter_instructions: Optional[str]
+    rewriter_instructions: Optional[str]
+    referral_instructions: Optional[str]
 
     # Loop Controls
     iteration: int

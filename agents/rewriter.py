@@ -40,8 +40,11 @@ Optimize the candidate's EXISTING resume to match the target Job Description (JD
 4. ACTION VERBS:
    - Anchor bullets with strong active verbs chosen from the appropriate category in the provided catalog.
 
-USER AUXILIARY INSTRUCTIONS:
-{auxiliary_instructions}"""),
+CRITICAL - USER AUXILIARY INSTRUCTIONS (HIGHEST PRIORITY OVERRIDE):
+{auxiliary_instructions}
+
+PRIORITY DIRECTIVE:
+If user auxiliary instructions are provided above, they take ABSOLUTE PRECEDENCE and HIGHEST PRIORITY over standard resume tailoring guidelines, action verb rules, or structural constraints whenever a conflict arises. Always honor the user's specific guidance (e.g. emphasis, tone, omissions, or highlighting specific achievements)."""),
     ("user", """--- TARGET JOB DESCRIPTION ---
 {job_description}
 
@@ -72,7 +75,17 @@ def rewriter_node(state: AgentState) -> Dict[str, Any]:
         num_predict=4096
     ).with_structured_output(RewriterResult)
 
-    aux_instructions = state.get("auxiliary_instructions") or "None provided. Apply standard tailoring guidelines."
+    rewriter_inst = (state.get("rewriter_instructions") or "").strip()
+    general_inst = (state.get("auxiliary_instructions") or "").strip()
+
+    if rewriter_inst and general_inst:
+        aux_instructions = f"[Specific Re-writer Instructions - Top Priority]:\n{rewriter_inst}\n\n[General Guidance]:\n{general_inst}"
+    elif rewriter_inst:
+        aux_instructions = rewriter_inst
+    elif general_inst:
+        aux_instructions = general_inst
+    else:
+        aux_instructions = "None provided. Apply standard tailoring guidelines."
 
     chain = REWRITER_PROMPT | llm
     result: RewriterResult = chain.invoke({

@@ -76,7 +76,25 @@ console = Console()
     "--instructions", "-i",
     type=str,
     default=None,
-    help="Auxiliary instructions/guidance for Recruiter evaluation and Re-writer tailoring (accepts a string or path to a .txt file)."
+    help="General auxiliary instructions applied across all agents (accepts a string or path to a .txt file)."
+)
+@click.option(
+    "--recruiter-instructions", "--recruiter-inst",
+    type=str,
+    default=None,
+    help="Auxiliary instructions specifically for the Recruiter agent (accepts a string or path to a .txt file)."
+)
+@click.option(
+    "--rewriter-instructions", "--rewriter-inst",
+    type=str,
+    default=None,
+    help="Auxiliary instructions specifically for the Re-writer agent (accepts a string or path to a .txt file)."
+)
+@click.option(
+    "--referral-instructions", "--referral-inst",
+    type=str,
+    default=None,
+    help="Auxiliary instructions specifically for the Referral agent (accepts a string or path to a .txt file)."
 )
 def run_cli(
     resume: Path,
@@ -88,6 +106,9 @@ def run_cli(
     force: bool,
     max_loops: Optional[int],
     instructions: Optional[str],
+    recruiter_instructions: Optional[str],
+    rewriter_instructions: Optional[str],
+    referral_instructions: Optional[str],
     skip_bootstrap: bool
 ):
     """
@@ -165,16 +186,26 @@ def run_cli(
     # --- 5. State Initialization ---
     target_max_loops = max_loops if max_loops is not None else settings.MAX_LOOPS
 
-     # --- 6. Parse Auxiliary Instructions (File or Raw String) ---
-    aux_text = ""
-    if instructions:
-        inst_path = Path(instructions)
-        if inst_path.is_file():
-            console.print(f"[cyan]Loading auxiliary instructions from file:[/cyan] {inst_path}")
-            aux_text = inst_path.read_text(encoding="utf-8").strip()
+    # --- 6. Parse Auxiliary Instructions (File or Raw String) ---
+    def _parse_inst(val: Optional[str], label: str) -> Optional[str]:
+        if not val:
+            return None
+        inst_p = Path(val)
+        if inst_p.is_file():
+            console.print(f"[cyan]Loading {label} instructions from file:[/cyan] {inst_p}")
+            txt = inst_p.read_text(encoding="utf-8").strip()
         else:
-            aux_text = instructions.strip()
-        console.print(f"[green]Active Auxiliary Guidance:[/green] [dim]\"{aux_text[:100]}...\"[/dim]\n")
+            txt = val.strip()
+        preview = txt[:80] + ("..." if len(txt) > 80 else "")
+        console.print(f"[green]Active {label} Guidance:[/green] [dim]\"{preview}\"[/dim]")
+        return txt
+
+    aux_general = _parse_inst(instructions, "General")
+    aux_recruiter = _parse_inst(recruiter_instructions, "Recruiter")
+    aux_rewriter = _parse_inst(rewriter_instructions, "Re-writer")
+    aux_referral = _parse_inst(referral_instructions, "Referral")
+    if aux_general or aux_recruiter or aux_rewriter or aux_referral:
+        console.print()
 
     initial_state: AgentState = {
         "company": company,
@@ -184,7 +215,10 @@ def run_cli(
         "job_description": job_description,
         "base_resume": base_resume_text,
         "current_resume": base_resume_text,
-        "auxiliary_instructions": aux_text,  # <-- Injected into state
+        "auxiliary_instructions": aux_general,
+        "recruiter_instructions": aux_recruiter,
+        "rewriter_instructions": aux_rewriter,
+        "referral_instructions": aux_referral,
         "iteration": 1,
         "max_loops": max_loops or settings.MAX_LOOPS,
         "match_tier": "Pending",

@@ -40,7 +40,13 @@ STEP-BY-STEP WRITING GUIDE:
 STRICT NEGATIVE RESTRICTIONS:
 - NEVER say "If you know someone fitting this role" or "I am reaching out to connect you with a candidate".
 - NEVER refer to yourself in the third person ("they", "the candidate").
-- Keep the entire body between 60 and 90 words. Avoid fluff, excessive pleasantries, or life stories."""
+- Keep the entire body concise (typically 60 to 90 words unless user instructions specify otherwise). Avoid fluff, excessive pleasantries, or life stories.
+
+CRITICAL - USER AUXILIARY INSTRUCTIONS (HIGHEST PRIORITY OVERRIDE):
+{auxiliary_instructions}
+
+PRIORITY DIRECTIVE:
+If user auxiliary instructions are provided above, they take ABSOLUTE PRECEDENCE and HIGHEST PRIORITY over default tone, length, or template phrasing whenever a conflict arises. Tailor the message according to the user's specific guidance."""
     ),
     (
         "user",
@@ -68,12 +74,25 @@ def referral_node(state: AgentState) -> Dict[str, Any]:
     strengths_list = state.get("strengths") or []
     strengths_text = "\n".join(f"- {s}" for s in strengths_list[:3]) or "- Python, RAG architectures, and distributed ML pipelines."
 
+    referral_inst = (state.get("referral_instructions") or "").strip()
+    general_inst = (state.get("auxiliary_instructions") or "").strip()
+
+    if referral_inst and general_inst:
+        aux_instructions = f"[Specific Referral Instructions - Top Priority]:\n{referral_inst}\n\n[General Guidance]:\n{general_inst}"
+    elif referral_inst:
+        aux_instructions = referral_inst
+    elif general_inst:
+        aux_instructions = general_inst
+    else:
+        aux_instructions = "None provided. Apply standard outreach guidelines."
+
     chain = REFERRAL_PROMPT | llm
 
     res: ReferralResult = chain.invoke({
         "role": state["role"],
         "company": state["company"],
-        "strengths": strengths_text
+        "strengths": strengths_text,
+        "auxiliary_instructions": aux_instructions
     })
 
     full_message = f"Subject: {res.subject_line}\n\n{res.message}"

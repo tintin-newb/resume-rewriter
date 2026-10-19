@@ -41,11 +41,13 @@ EVALUATION TIERS AND CALIBRATION:
    - The candidate's discipline or career track is completely unrelated to the role.
 
 2. "Low Match":
-   - Domain Misalignment: The candidate has technical skills, but their primary day-to-day specialization is in a different engineering or technical subfield than what the role demands (even if they share common programming languages or generic tools).
-   - Core Deficiencies: Fails mandatory minimum requirements such as required years of commercial experience in the primary domain, or lacks the central production stack.
+   - Domain Misalignment: The candidate has technical skills, but their primary day-to-day specialization is in a distant, non-adjacent engineering or technical subfield with no shared foundational or abstract domain (even if they share common programming languages or generic tools).
+   - EXCEPTION FOR ABSTRACT / SPECIALIZED DOMAINS: DO NOT classify as "Low Match" if the required skills or domain knowledge are specialized versions, subfields, or concrete applications of a closely related abstract domain that the candidate already possesses (e.g., General Systems Programming <-> Distributed Storage, Backend Engineering <-> Data Engineering, Machine Learning <-> NLP/LLMs, Cloud Infrastructure <-> Site Reliability/DevOps). Such transferable abstract-to-specialized alignment must be graded as "Average Match" or higher!
+   - Core Deficiencies: Fails mandatory minimum requirements such as required years of commercial experience in the primary domain, or lacks the central production stack with no transferable foundational counterpart.
 
 3. "Average Match":
-   - The candidate has adjacent or transferable experience, but exhibits major gaps in mandatory day-to-day deliverables, key frameworks, or domain methodologies. Needs extensive tailoring to be competitive.
+   - The candidate has adjacent or transferable experience, or their background is in a closely related abstract domain where the required skills are specialized versions (or vice versa).
+   - While they may exhibit gaps in specific niche tools, specialized production frameworks, or commercial domain nuances, their abstract domain competence provides a strong transferable bridge. Needs tailoring to highlight this domain alignment.
 
 4. "High Match":
    - Strong candidate. Possesses 80%+ of core requirements, verified hands-on commercial experience in the primary domain, and clear relevance. Minor gaps only.
@@ -55,10 +57,13 @@ EVALUATION TIERS AND CALIBRATION:
 
 GENERIC CALIBRATION PRINCIPLE:
 - Never award 'High Match' or 'Perfect Match' simply because a candidate shares a programming language or generic technical baseline. 
-- If the role requires daily production mastery of a specific specialization and the candidate's career has been spent in a different domain, strictly classify them as 'Low Match' or 'Average Match'.
+- Distinguish between true domain misalignment versus specialized instances of an abstract domain: If the role requires daily production mastery of a specialized subfield and the candidate has deep experience in the foundational or abstract domain, treat this as transferable experience ("Average Match" or higher), NOT "Low Match". Reserve "Low Match" only for candidates lacking both the specialization and the abstract domain foundations.
 
-USER AUXILIARY INSTRUCTIONS:
-{auxiliary_instructions}"""),
+CRITICAL - USER AUXILIARY INSTRUCTIONS (HIGHEST PRIORITY OVERRIDE):
+{auxiliary_instructions}
+
+PRIORITY DIRECTIVE:
+If user auxiliary instructions are provided above, they take ABSOLUTE PRECEDENCE and HIGHEST PRIORITY over any default evaluation rules, standard tier thresholds, or calibration principles whenever a conflict arises. Always adhere strictly to the user's explicit guidance."""),
     ("user", """--- JOB DESCRIPTION ---
 {job_description}
 
@@ -78,7 +83,17 @@ def recruiter_node(state: AgentState) -> Dict[str, Any]:
         num_predict=2048
     ).with_structured_output(RecruiterVerdict)
 
-    aux_instructions = state.get("auxiliary_instructions") or "None provided. Apply standard strict evaluation."
+    recruiter_inst = (state.get("recruiter_instructions") or "").strip()
+    general_inst = (state.get("auxiliary_instructions") or "").strip()
+
+    if recruiter_inst and general_inst:
+        aux_instructions = f"[Specific Recruiter Instructions - Top Priority]:\n{recruiter_inst}\n\n[General Guidance]:\n{general_inst}"
+    elif recruiter_inst:
+        aux_instructions = recruiter_inst
+    elif general_inst:
+        aux_instructions = general_inst
+    else:
+        aux_instructions = "None provided. Apply standard strict evaluation."
 
     chain = RECRUITER_PROMPT | llm
     verdict: RecruiterVerdict = chain.invoke({
