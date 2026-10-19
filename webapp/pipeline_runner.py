@@ -3,6 +3,7 @@ import json
 import re
 import time
 import uuid
+from datetime import datetime, date
 from pathlib import Path
 from typing import Dict, Any, Optional, AsyncGenerator
 
@@ -16,6 +17,15 @@ from agents.state import AgentState
 
 # In-memory storage for tasks and their active event streams
 active_tasks: Dict[str, Dict[str, Any]] = {}
+
+
+def _json_default(obj: Any) -> Any:
+    """JSON serializer for objects not serializable by default json code (e.g. datetime, Path)."""
+    if isinstance(obj, (datetime, date)):
+        return obj.isoformat()
+    if isinstance(obj, Path):
+        return str(obj)
+    return str(obj)
 
 
 class PipelineTask:
@@ -41,11 +51,11 @@ class PipelineTask:
     async def stream_events(self) -> AsyncGenerator[str, None]:
         # First send any historical events already queued
         for prev in self.events_history:
-            yield f"data: {json.dumps(prev)}\n\n"
+            yield f"data: {json.dumps(prev, default=_json_default)}\n\n"
 
         while True:
             event = await self.queue.get()
-            yield f"data: {json.dumps(event)}\n\n"
+            yield f"data: {json.dumps(event, default=_json_default)}\n\n"
             if event["type"] in ("complete", "error", "cached"):
                 break
 
