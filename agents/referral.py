@@ -13,7 +13,7 @@ class ReferralResult(BaseModel):
     )
     message: str = Field(
         ...,
-        description="The first-person referral request note written directly from the candidate asking for an internal referral (60 to 90 words)."
+        description="The first-person referral request note highlighting transferable architectural alignment (60 to 90 words)."
     )
 
 
@@ -23,37 +23,36 @@ REFERRAL_PROMPT = ChatPromptTemplate.from_messages([
         """You are the JOB APPLICANT (The Candidate). 
 You are writing a direct, polite message to an existing employee or engineering lead at {company} on LinkedIn or email, asking them to submit an internal job referral for YOU for the {role} position.
 
-YOUR IDENTITY & MINDSET:
-- You are NOT a recruiter, career coach, agency scout, or third-party strategist.
-- You are NOT sourcing candidates, and you are NOT asking if they know someone else for the job.
-- YOU are an accomplished software/ML engineer who wants to work at {company}, reaching out to a peer to request an internal referral.
+YOUR IDENTITY & PERSPECTIVE:
+- Write strictly in the FIRST PERSON ("I", "my background", "I have worked with").
+- You are an accomplished engineer reaching out peer-to-peer to request an internal referral.
+- Pitch your fit around TRANSFERABLE ARCHITECTURAL VALUE: highlight how your hands-on mastery of scalable systems, model optimization (e.g., vLLM/LoRA), and industry/platform scale allows you to contribute immediately to their specific team challenges.
 
 STEP-BY-STEP WRITING GUIDE:
 1. GREETING: Start with "Hi [Name]," (or "Hi [First Name],").
-2. THE HOOK: Mention that you came across the {role} opening at {company} and are very excited about the team's work.
-3. THE FIT (1-2 sentences): Highlight 1 or 2 specific technical accomplishments from your background that make you an immediate fit for this opening.
-4. THE ASK: Directly ask if they would be open to reviewing your resume and submitting an internal referral on your behalf.
+2. THE HOOK: State that you noticed the {role} opening on their team at {company} and are excited by their engineering direction.
+3. THE TRANSFERABLE VALUE (1-2 sentences): Connect your proven background in core relevant systems (e.g., distributed inference, vector search, high-throughput pipelines, or shared macro-domain experience) directly to their platform requirements.
+4. THE ASK: Politely ask if they would be open to reviewing your resume or submitting an internal referral on your behalf.
 5. CLOSING: Thank them for their time and sign off with:
    Best regards,
    [Your Name]
 
-STRICT NEGATIVE RESTRICTIONS:
-- NEVER say "If you know someone fitting this role" or "I am reaching out to connect you with a candidate".
-- NEVER refer to yourself in the third person ("they", "the candidate").
-- Keep the entire body concise (typically 60 to 90 words unless user instructions specify otherwise). Avoid fluff, excessive pleasantries, or life stories.
+STRICT RESTRICTIONS:
+- NEVER say "If you know someone fitting this role" or speak in the third person.
+- Keep the entire body concise (60 to 90 words). Avoid fluff or generic flattery.
 
 CRITICAL - USER AUXILIARY INSTRUCTIONS (HIGHEST PRIORITY OVERRIDE):
 {auxiliary_instructions}
 
 PRIORITY DIRECTIVE:
-If user auxiliary instructions are provided above, they take ABSOLUTE PRECEDENCE and HIGHEST PRIORITY over default tone, length, or template phrasing whenever a conflict arises. Tailor the message according to the user's specific guidance."""
+If user auxiliary instructions are provided above, they take ABSOLUTE PRECEDENCE and HIGHEST PRIORITY over default tone or phrasing whenever a conflict arises."""
     ),
     (
         "user",
         """Target Role: {role}
 Target Company: {company}
 
-My Verified Strengths:
+My Transferable Architectural Strengths:
 {strengths}
 
 Write the direct referral request message from me asking the recipient for an internal referral."""
@@ -62,7 +61,7 @@ Write the direct referral request message from me asking the recipient for an in
 
 
 def referral_node(state: AgentState) -> Dict[str, Any]:
-    """Generates a high-converting referral request written by the applicant."""
+    """Generates an impactful first-person outreach message emphasizing transferable strengths."""
     llm = ChatOllama(
         model=settings.OLLAMA_MODEL,
         base_url=settings.OLLAMA_BASE_URL,
@@ -72,7 +71,7 @@ def referral_node(state: AgentState) -> Dict[str, Any]:
     ).with_structured_output(ReferralResult)
 
     strengths_list = state.get("strengths") or []
-    strengths_text = "\n".join(f"- {s}" for s in strengths_list[:3]) or "- Python, RAG architectures, and distributed ML pipelines."
+    strengths_text = "\n".join(f"- {s}" for s in strengths_list[:3]) or "- Distributed model serving, high-throughput streaming, and vector search systems."
 
     referral_inst = (state.get("referral_instructions") or "").strip()
     general_inst = (state.get("auxiliary_instructions") or "").strip()
