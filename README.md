@@ -16,7 +16,118 @@ The **Agentic Resume Rewriter** addresses this by orchestrating a feedback loop 
 
 ---
 
-## 2. Directory Structure & Module Breakdown
+## 2. System Architecture
+
+The following diagram illustrates the main components of the application and how they communicate across ingestion, orchestration, persistence, and local LLM inference:
+
+```mermaid
+flowchart TD
+    %% User Interfaces / Clients
+    subgraph Clients["1. User Interfaces"]
+        CLI["CLI Interface<br/>(run_cli.py)"]
+        WEB["Web Dashboard<br/>(FastAPI + SSE)"]
+    end
+
+    %% Ingestion Layer
+    subgraph Ingestion["2. Ingestion & Parsing"]
+        RP["Resume Parser<br/>(PDF, MD, TXT, DOCX)"]
+        JDS["JD Scraper<br/>(Crawl4AI / BeautifulSoup)"]
+    end
+
+    %% Core Multi-Agent Orchestration
+    subgraph Agents["3. LangGraph Multi-Agent Core"]
+        REC["Recruiter Agent<br/>(Evaluator, temp = 0)"]
+        DEC{"Target Match<br/>Achieved?"}
+        REW["Re-writer Agent<br/>(Optimizer + Action Verbs)"]
+        REF["Referral Generator<br/>(Outreach Draft)"]
+    end
+
+    %% Storage & External Infrastructure
+    subgraph Storage["4. Storage & LLM Infrastructure"]
+        OLLAMA[("Ollama LLM Engine<br/>(Local Inference: qwen2.5)")]
+        DB[("PostgreSQL Database<br/>(Run Cache & History)")]
+        OUT["Output Resumes<br/>(output/ & uploads/)"]
+    end
+
+    %% Client communication
+    CLI -->|"Base Resume"| RP
+    CLI -->|"Job URL / Text"| JDS
+    WEB -->|"Base Resume"| RP
+    WEB -->|"Job URL / Text"| JDS
+    CLI <-.->|"Check Cache / Save Run"| DB
+    WEB <-.->|"Check Cache / Save Run"| DB
+
+    %% Ingestion to Agents
+    RP -->|"Parsed Candidate Text"| REC
+    JDS -->|"Parsed Job Description"| REC
+
+    %% Evaluator-Optimizer Feedback Loop
+    REC -->|"Audit Verdict & Tier"| DEC
+    DEC -->|"No (Within Max Loops)"| REW
+    REW -->|"Tailored Bullets"| REC
+
+    %% Workflow Completion
+    DEC -->|"Yes (High / Perfect Match)"| REF
+    DEC -->|"Max Loops Reached"| OUT
+    REF -->|"Referral Message"| OUT
+    OUT -.->|"Persist File Path"| DB
+
+    %% LLM Invocations
+    REC <-.->|"Prompt & Evaluation"| OLLAMA
+    REW <-.->|"Prompt & Rewrites"| OLLAMA
+    REF <-.->|"Prompt & Outreach"| OLLAMA
+```
+
+### Component Communication Breakdown
+
+- **User Interfaces (`run_cli.py` & `webapp/`)**: Accepts candidate resumes and job inputs (URL or raw text). Coordinates pre-flight health checks and performs instant cache lookups against PostgreSQL (`Company` + `Job ID`) to avoid redundant LLM invocations unless `--force` is specified.
+- **Ingestion & Parsing (`parsers/` & `scrapers/`)**: `ResumeParser` extracts normalized text from `.pdf`, `.md`, `.txt`, and `.docx` documents. `JDScraper` uses Crawl4AI (headless Chromium) with JSON-LD schema parsing and SPA delay handling to extract clean job postings from career sites or local files.
+- **LangGraph Multi-Agent Core (`agents/`)**: Manages the Evaluator-Optimizer feedback loop via `StateGraph`:
+  - **Recruiter Agent (Evaluator):** Deterministically (`temperature = 0`) compares candidate qualifications against JD requirements, producing structured gap analyses, strengths, and a categorical match tier.
+  - **Decision Router (`should_continue`):** Evaluates if the match tier qualifies as passing (`High Match` or `Perfect Match`) or if `max_loops` has been reached.
+  - **Re-writer Agent (Optimizer):** Takes recruiter feedback and a curated action verb taxonomy to rewrite bullets using active voice and metrics without fabricating facts (zero-hallucination constraint), then routes back to the Recruiter.
+  - **Referral Generator Agent:** When target qualification is reached, drafts an outreach message for LinkedIn or email.
+- **Storage & External Infrastructure**:
+  - **Ollama**: Provides private local inference for LLM prompts across all agent nodes.
+  - **PostgreSQL**: Stores execution state, audit logs, and history for the web archive.
+  - **Output Artifacts**: Saves the final optimized Markdown resume to `output/<Company>_<JobID>_resume.md` and user uploads to `~/.resume-rewriter/uploads/`.
+
+### Tech Stack & System Specifications
+
+> These are specs on which the application has been built and tested.
+
+#### Technology Stack & Versions
+| Category | Component / Library | Version | Purpose |
+| :--- | :--- | :--- | :--- |
+| **Runtime** | Python | `3.10.12` | Core programming language runtime |
+| **Agent Framework** | LangGraph | `1.2.15` | StateGraph orchestrator & cyclic Evaluator-Optimizer loop |
+| **LLM Orchestration** | LangChain Core | `1.6.12` | Prompt templates, structured outputs, and chain execution |
+| **LLM Integration** | LangChain-Ollama | `1.1.0` | Integration layer between LangChain and local Ollama |
+| **Local LLM Engine** | Ollama | `0.40.5` | Local model inference hosting (`qwen2.5:7b` / `qwen2.5:14b`) |
+| **Database** | PostgreSQL (`psql`) | `14.24` | Application state persistence, run history, and caching |
+| **Database Driver** | Psycopg 3 | `3.2.0+` | PostgreSQL database adapter for Python |
+| **Web Framework** | FastAPI | `0.143.3` | REST endpoints and Server-Sent Events (SSE) streaming |
+| **ASGI Server** | Uvicorn | `0.54.0` | High-performance ASGI web server |
+| **Web Scraping** | Playwright (Crawl4AI) | `1.64.0` | Dynamic headless Chromium browser rendering & job scraping |
+| **HTML Parsing** | BeautifulSoup4 | `4.12.0+` | DOM extraction, text cleanup, and JSON-LD schema parsing |
+| **Document Parsing** | PyPDF | `5.0.0+` | Candidate resume PDF parsing and text extraction |
+| **CLI Framework** | Click | `8.5.0` | CLI argument and option parsing |
+| **Terminal UI** | Rich | `15.0.0` | Terminal formatting, progress indicators, tables, and panels |
+| **Configuration** | Pydantic / Pydantic-Settings | `2.14.1` / `2.15.0` | Typed settings management and environment loading |
+| **Containerization** | Docker | `28.3.2` | Container platform for multi-container deployment |
+
+#### Tested System Specifications (Hardware & Host OS)
+| Specification | Details |
+| :--- | :--- |
+| **Operating System** | Ubuntu 22.04.5 LTS (x86_64, Linux Kernel `6.8.0-138-generic`) |
+| **CPU** | 12th Gen Intel(R) Core(TM) i7-12700H (14 Cores / 20 Threads, up to 4.70 GHz) |
+| **System Memory (RAM)** | 32 GB DDR (30 GiB usable) |
+| **GPU / Acceleration** | NVIDIA RTX A2000 8GB Laptop GPU (Driver `570.158.01`, CUDA `12.8`) |
+| **Storage Requirement** | ~15 GB free disk space (includes Playwright Chromium browser and local LLM weights) |
+
+---
+
+## 3. Directory Structure & Module Breakdown
 
 ```text
 resume_rewriter/
@@ -82,9 +193,9 @@ resume_rewriter/
 
 ---
 
-## 3. Setup Steps
+## 4. Setup Steps
 
-### 3.1. Database Setup (PostgreSQL)
+### 4.1. Database Setup (PostgreSQL)
 
 1. Install PostgreSQL through your OS package manager (`brew install postgresql` on macOS, `apt install postgresql` on Ubuntu).
 2. Start the service:
@@ -105,7 +216,7 @@ psql -h localhost -p 5432 -U postgres -d resume_rewriter_db -f db/schema.sql
 
 ---
 
-### 3.2. Ollama & LLM Setup
+### 4.2. Ollama & LLM Setup
 
 The application is configured by default for `qwen2.5:7b`, but works with larger variants (`qwen2.5:14b`, `qwen2.5:32b`) as well.
 
@@ -154,7 +265,7 @@ docker exec -it ollama_cpu ollama pull qwen2.5:7b
 
 ---
 
-### 3.3. Python Environment Setup
+### 4.3. Python Environment Setup
 
 Requires **Python 3.10+**.
 
@@ -181,7 +292,7 @@ Requires **Python 3.10+**.
 
 ---
 
-### 3.4. Environment Variables (`.env`)
+### 4.4. Environment Variables (`.env`)
 
 Create your `.env` configuration file from the provided template:
 ```bash
@@ -214,7 +325,7 @@ MAX_LOOPS=3
 
 ---
 
-### 3.5. Docker Build & Deployment
+### 4.5. Docker Build & Deployment
 
 As an alternative to native local Python setup, you can build and run the application and its LLM backend using Docker and Docker Compose.
 
@@ -257,7 +368,7 @@ docker compose down
 
 ---
 
-## 4. Run Methodology
+## 5. Run Methodology
 
 ### Step 1: Run Pre-flight Health Checks
 Before starting a full run, verify that your local systems (PostgreSQL, Ollama, model availability) are operational:
@@ -360,7 +471,7 @@ python run_cli.py \
 
 ---
 
-## 5. Output Artifacts
+## 6. Output Artifacts
 
 Upon completion of a successful run:
 1. **Optimized Resume File**: A structured Markdown resume is generated at:
@@ -372,7 +483,7 @@ Upon completion of a successful run:
 
 ---
 
-## 6. Interactive Web UI Dashboard
+## 7. Interactive Web UI Dashboard
 
 A modern, dark-themed Web UI is available to interactively tailor resumes and review history:
 
@@ -401,19 +512,19 @@ Open **[http://localhost:8000](http://localhost:8000)** in your browser.
 
 ---
 
-## 7. Troubleshooting & FAQs
+## 8. Troubleshooting & FAQs
 
-### 7.1. "Service Issue" Status Badge in UI
+### 8.1. "Service Issue" Status Badge in UI
 * **Ollama Host Resolution:** On native Linux, Ollama runs on `http://localhost:11434` (or `http://127.0.0.1:11434`), while `http://host.docker.internal:11434` is only routable inside Docker containers. `bootstrap.py` automatically resolves and falls back to `localhost:11434`.
 * **Hovering Details:** Hover over or click the health pill in the top header (`System Ready` / `Service Issue`) to see exact diagnostic messages for both PostgreSQL and Ollama.
 * **Model Readiness:** Ensure the model specified in settings (e.g. `qwen2.5:7b` or `qwen3:8b`) is pulled locally via `ollama pull <model-name>`.
 
-### 7.2. PostgreSQL Connection Failures
+### 8.2. PostgreSQL Connection Failures
 * Ensure PostgreSQL is running (`sudo systemctl status postgresql` or `pg_isready`).
 * Verify that the database and user match your `~/.resume-rewriter/config.env` settings.
 * Test connectivity using `./env_rr/bin/python bootstrap.py` or the **Test Connections** button in the Web UI Settings drawer.
 
-### 7.3. Force Re-running Cached Applications
+### 8.3. Force Re-running Cached Applications
 * If an application was already evaluated for a given Company and Job ID, the system caches the result to avoid redundant compute.
 * In the CLI: Add the `--force` / `-f` flag.
 * In the Web UI: Expand the **Advanced Run Configuration** accordion and check **Force re-execution if cached**.
