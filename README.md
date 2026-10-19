@@ -92,6 +92,39 @@ flowchart TD
   - **PostgreSQL**: Stores execution state, audit logs, and history for the web archive.
   - **Output Artifacts**: Saves the final optimized Markdown resume to `output/<Company>_<JobID>_resume.md` and user uploads to `~/.resume-rewriter/uploads/`.
 
+### Tech Stack & System Specifications
+
+#### Technology Stack & Versions
+| Category | Component / Library | Version | Purpose |
+| :--- | :--- | :--- | :--- |
+| **Runtime** | Python | `3.10.12` | Core programming language runtime |
+| **Agent Framework** | LangGraph | `1.2.15` | StateGraph orchestrator & cyclic Evaluator-Optimizer loop |
+| **LLM Orchestration** | LangChain Core | `1.6.12` | Prompt templates, structured outputs, and chain execution |
+| **LLM Integration** | LangChain-Ollama | `1.1.0` | Integration layer between LangChain and local Ollama |
+| **Local LLM Engine** | Ollama | `0.40.5` | Local model inference hosting (`qwen2.5:7b` / `qwen2.5:14b`) |
+| **Database** | PostgreSQL (`psql`) | `14.24` | Application state persistence, run history, and caching |
+| **Database Driver** | Psycopg 3 | `3.2.0+` | PostgreSQL database adapter for Python |
+| **Web Framework** | FastAPI | `0.143.3` | REST endpoints and Server-Sent Events (SSE) streaming |
+| **ASGI Server** | Uvicorn | `0.54.0` | High-performance ASGI web server |
+| **Web Scraping** | Playwright (Crawl4AI) | `1.64.0` | Dynamic headless Chromium browser rendering & job scraping |
+| **HTML Parsing** | BeautifulSoup4 | `4.12.0+` | DOM extraction, text cleanup, and JSON-LD schema parsing |
+| **Document Parsing** | PyPDF | `5.0.0+` | Candidate resume PDF parsing and text extraction |
+| **CLI Framework** | Click | `8.5.0` | CLI argument and option parsing |
+| **Terminal UI** | Rich | `15.0.0` | Terminal formatting, progress indicators, tables, and panels |
+| **Configuration** | Pydantic / Pydantic-Settings | `2.14.1` / `2.15.0` | Typed settings management and environment loading |
+| **Containerization** | Docker | `28.3.2` | Container platform for multi-container deployment |
+
+#### Tested System Specifications (Hardware & Host OS)
+| Specification | Details |
+| :--- | :--- |
+| **Operating System** | Ubuntu 22.04.5 LTS (x86_64, Linux Kernel `6.8.0-138-generic`) |
+| **CPU** | 12th Gen Intel(R) Core(TM) i7-12700H (14 Cores / 20 Threads, up to 4.70 GHz) |
+| **System Memory (RAM)** | 32 GB DDR (30 GiB usable) |
+| **GPU / Acceleration** | NVIDIA RTX A2000 8GB Laptop GPU (Driver `570.158.01`, CUDA `12.8`) |
+| **Storage Requirement** | ~15 GB free disk space (includes Playwright Chromium browser and local LLM weights) |
+
+---
+
 ## 3. Directory Structure & Module Breakdown
 
 ```text
