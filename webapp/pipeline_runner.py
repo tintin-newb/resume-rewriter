@@ -3,6 +3,7 @@ import json
 import re
 import time
 import uuid
+from datetime import datetime, date
 from pathlib import Path
 from typing import Dict, Any, Optional, AsyncGenerator
 
@@ -16,6 +17,15 @@ from agents.state import AgentState
 
 # In-memory storage for tasks and their active event streams
 active_tasks: Dict[str, Dict[str, Any]] = {}
+
+
+def _json_default(obj: Any) -> Any:
+    """JSON serializer for objects not serializable by default json code (e.g. datetime, Path)."""
+    if isinstance(obj, (datetime, date)):
+        return obj.isoformat()
+    if isinstance(obj, Path):
+        return str(obj)
+    return str(obj)
 
 
 class PipelineTask:
@@ -41,11 +51,11 @@ class PipelineTask:
     async def stream_events(self) -> AsyncGenerator[str, None]:
         # First send any historical events already queued
         for prev in self.events_history:
-            yield f"data: {json.dumps(prev)}\n\n"
+            yield f"data: {json.dumps(prev, default=_json_default)}\n\n"
 
         while True:
             event = await self.queue.get()
-            yield f"data: {json.dumps(event)}\n\n"
+            yield f"data: {json.dumps(event, default=_json_default)}\n\n"
             if event["type"] in ("complete", "error", "cached"):
                 break
 
@@ -188,6 +198,9 @@ async def run_pipeline_job(task: PipelineTask):
 
         # Step 4: State Initialization
         auxiliary_instructions = (task.payload.get("auxiliary_instructions") or "").strip()
+        recruiter_instructions = (task.payload.get("recruiter_instructions") or "").strip()
+        rewriter_instructions = (task.payload.get("rewriter_instructions") or "").strip()
+        referral_instructions = (task.payload.get("referral_instructions") or "").strip()
 
         initial_state: AgentState = {
             "company": company,
@@ -198,6 +211,9 @@ async def run_pipeline_job(task: PipelineTask):
             "base_resume": base_resume_text,
             "current_resume": base_resume_text,
             "auxiliary_instructions": auxiliary_instructions or None,
+            "recruiter_instructions": recruiter_instructions or None,
+            "rewriter_instructions": rewriter_instructions or None,
+            "referral_instructions": referral_instructions or None,
             "iteration": 1,
             "max_loops": max_loops,
             "match_tier": "Pending",
@@ -259,12 +275,13 @@ async def run_pipeline_job(task: PipelineTask):
                         })
 
                     elif node_name == "rewriter":
+                        round_num = max(1, final_state.get("iteration", 2) - 1)
                         await task.emit("step", {
                             "step": "rewriter",
-                            "title": f"Re-writer Optimization Pass (Round {final_state.get('iteration', 1)})",
+                            "title": f"Re-writer Optimization Pass (Round {round_num})",
                             "status": "completed",
                             "data": {
-                                "round": final_state.get("iteration", 1),
+                                "round": round_num,
                                 "modifications_made": node_output.get("modifications_made", [])
                             }
                         })

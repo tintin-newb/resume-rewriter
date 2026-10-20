@@ -402,10 +402,22 @@ Options:
   --max-loops INTEGER      Maximum rewriter iterations (default: 3).
   --skip-bootstrap         Skip pre-flight health checks for Ollama and
                            PostgreSQL.
-  -i, --instructions TEXT  Auxiliary instructions/guidance for Recruiter
-                           evaluation and Re-writer tailoring (accepts a
-                           string or path to a .txt file).
-  --help                   Show this message and exit.
+  -i, --instructions TEXT         General auxiliary instructions applied
+                                  across all agents (accepts a string or path
+                                  to a .txt file).
+  --recruiter-instructions, --recruiter-inst TEXT
+                                  Auxiliary instructions specifically for the
+                                  Recruiter agent (accepts a string or path to
+                                  a .txt file).
+  --rewriter-instructions, --rewriter-inst TEXT
+                                  Auxiliary instructions specifically for the
+                                  Re-writer agent (accepts a string or path to
+                                  a .txt file).
+  --referral-instructions, --referral-inst TEXT
+                                  Auxiliary instructions specifically for the
+                                  Referral agent (accepts a string or path to
+                                  a .txt file).
+  --help                          Show this message and exit.
 ```
 
 ---
@@ -457,8 +469,8 @@ python run_cli.py \
   --force
 ```
 
-#### Scenario D: Providing Auxiliary Guidance & Tone Instructions
-Provide custom focus areas, role-specific nuances, or tone directives (as an inline string or path to a `.txt` file):
+#### Scenario D: Providing Agent-Specific Auxiliary Guidance (Highest Priority)
+Steer specific agents individually or supply general guidance (as inline strings or paths to `.txt` files). Any provided auxiliary prompt takes highest priority over standard agent defaults:
 ```bash
 python run_cli.py \
   --resume "data/my_base_resume.pdf" \
@@ -466,7 +478,9 @@ python run_cli.py \
   --job-id "R171487" \
   --role "Machine Learning Engineer" \
   --url "https://careers.adobe.com/us/en/job/ADOBUSR171487EXTERNALENUS/Machine-Learning-Engineer-3" \
-  --instructions "Prioritize transformer model training and distributed PyTorch pipelines; emphasize production ML engineering rather than research."
+  --recruiter-instructions "Treat abstract ML systems background as transferable to generative AI pipelines; calibrate for Staff-level depth." \
+  --rewriter-instructions "Emphasize PyTorch distributed training and inference latency metrics; maintain concise XYZ bullet points." \
+  --referral-instructions "Keep note under 70 words; mention shared enthusiasm for Adobe Firefly."
 ```
 
 ---
@@ -497,7 +511,7 @@ Open **[http://localhost:8000](http://localhost:8000)** in your browser.
   * Drag & drop candidate base resume (`.pdf`, `.md`, `.txt`, `.docx`) — automatically saved to `~/.resume-rewriter/uploads/` for side-by-side version comparison.
   * Enter Target Company, Requisition ID, and Target Role.
   * Ingest Job Description via **URL Web Scrape** (Crawl4AI with JSON-LD schema parsing and SPA render delays) or **Direct Text / Paste**.
-  * **Auxiliary Instructions / Guidance (Optional):** Stateless per-run guidance to steer the Recruiter evaluation criteria and Re-writer optimization (e.g. tone directives, technical focus, or specific experience to emphasize).
+  * **Agent Guidance & Instructions (Optional):** Interactive segmented selector allowing agent-specific guidance (Recruiter, Re-writer, Referral) as well as general fallback instructions. Any provided auxiliary prompt takes highest priority during agent execution. Indicator dots highlight configured tabs.
   * Real-time Server-Sent Events (SSE) stepper reflecting each stage of the LangGraph agent pipeline: Pre-flight Bootstrap, Cache Verification, Content Ingestion, Recruiter Audit rounds (with Match Tier badge, strengths, gaps, and verdict), Re-writer Optimization passes, Referral Outreach, and Artifact saving.
 * **Tab 2: History (Interactive Run Archive):**
   * **Fully Independent:** Switching between tabs does not disrupt an ongoing generation task.

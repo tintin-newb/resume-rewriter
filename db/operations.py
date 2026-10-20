@@ -1,5 +1,17 @@
+from datetime import datetime, date
 from typing import Optional, Dict, Any
 from db.connection import get_db_connection
+
+
+def _format_row(row: Any) -> Optional[Dict[str, Any]]:
+    if not row:
+        return None
+    d = dict(row)
+    if isinstance(d.get("created_at"), (datetime, date)):
+        d["created_at"] = d["created_at"].isoformat()
+    if isinstance(d.get("updated_at"), (datetime, date)):
+        d["updated_at"] = d["updated_at"].isoformat()
+    return d
 
 
 def get_existing_application(company: str, job_id: str) -> Optional[Dict[str, Any]]:
@@ -14,7 +26,7 @@ def get_existing_application(company: str, job_id: str) -> Optional[Dict[str, An
             """, (company, job_id))
             row = cur.fetchone()
             if row:
-                return dict(row)
+                return _format_row(row)
     return None
 
 
@@ -78,7 +90,7 @@ def get_applications_history(offset: int = 0, limit: int = 15, search: Optional[
                 LIMIT %s OFFSET %s;
             """
             cur.execute(fetch_query, params + [limit, offset])
-            rows = [dict(r) for r in cur.fetchall()]
+            rows = [_format_row(r) for r in cur.fetchall()]
             return {
                 "total": total,
                 "offset": offset,
@@ -100,5 +112,5 @@ def get_application_by_id(app_id: int) -> Optional[Dict[str, Any]]:
             """, (app_id,))
             row = cur.fetchone()
             if row:
-                return dict(row)
+                return _format_row(row)
     return None

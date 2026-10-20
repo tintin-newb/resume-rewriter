@@ -29,24 +29,24 @@ def save_artifacts_node(state: AgentState) -> Dict[str, Any]:
     }
 
 
-def should_continue(state: AgentState) -> Literal["referral", "save_artifacts", "rewriter"]:
-    """Conditional router based purely on categorical match tier."""
+def should_continue(state: AgentState) -> Literal["referral", "save_artifacts", "recruiter"]:
+    """Conditional router determining next step after Re-writer has applied Recruiter suggestions."""
     tier = state.get("match_tier", "Low Match")
-    iteration = state["iteration"]
+    completed_passes = state["iteration"] - 1
     max_loops = state["max_loops"]
 
-    console.print(f"[bold magenta]▶ Iteration {iteration}: Recruiter Verdict = [yellow]{tier}[/yellow][/bold magenta]")
+    console.print(f"[bold magenta]▶ Pass {completed_passes}/{max_loops} Complete. Latest Audit Tier: [yellow]{tier}[/yellow][/bold magenta]")
 
     if tier in PASSING_TIERS:
-        console.print(f"[bold green]✓ Target match achieved ({tier})! Proceeding to Referral Generator...[/bold green]")
+        console.print(f"[bold green]✓ Target match achieved ({tier}) and suggestions implemented! Proceeding to Referral Generator...[/bold green]")
         return "referral"
 
-    if iteration >= max_loops:
-        console.print(f"[bold yellow]! Max loops ({max_loops}) reached without achieving High Match.[/bold yellow]")
+    if state["iteration"] > max_loops:
+        console.print(f"[bold yellow]! Max loops ({max_loops}) reached. Final suggestions implemented in altered resume.[/bold yellow]")
         return "save_artifacts"
 
-    console.print(f"[cyan]→ Tier is '{tier}'. Passing suggestions to Re-writer agent...[/cyan]")
-    return "rewriter"
+    console.print(f"[cyan]→ Tier is '{tier}'. Looping back to Recruiter for re-audit...[/cyan]")
+    return "recruiter"
 
 
 def build_workflow():
@@ -59,20 +59,21 @@ def build_workflow():
     graph.add_node("referral", referral_node)
     graph.add_node("save_artifacts", save_artifacts_node)
 
-    # Define edges
+    # Define edges: Recruiter ALWAYS passes feedback to Re-writer so suggestions are implemented regardless of tier
     graph.set_entry_point("recruiter")
+    graph.add_edge("recruiter", "rewriter")
 
+    # Re-writer routes conditionally based on tier and loop limits
     graph.add_conditional_edges(
-        "recruiter",
+        "rewriter",
         should_continue,
         {
             "referral": "referral",
             "save_artifacts": "save_artifacts",
-            "rewriter": "rewriter"
+            "recruiter": "recruiter"
         }
     )
 
-    graph.add_edge("rewriter", "recruiter")
     graph.add_edge("referral", "save_artifacts")
     graph.add_edge("save_artifacts", END)
 

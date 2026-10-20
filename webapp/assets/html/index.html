@@ -117,12 +117,57 @@
               </div>
             </div>
 
-            <!-- Auxiliary Instructions (Stateless Guidance) -->
-            <div class="form-group">
-              <label class="form-label" for="input-auxiliary-instructions">
-                Auxiliary Instructions / Guidance <span style="font-size: 0.75rem; color: var(--text-subtle); font-weight: normal;">(Optional)</span>
-              </label>
-              <textarea id="input-auxiliary-instructions" class="form-textarea" style="min-height: 75px; resize: vertical;" placeholder="e.g. Focus on distributed systems & Kafka; maintain senior-level tone; emphasize cloud architectures."></textarea>
+            <!-- Agent-Specific Auxiliary Instructions -->
+            <div class="form-group aux-guidance-container">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <label class="form-label" style="margin-bottom: 0;">
+                  Agent Guidance & Instructions <span style="font-size: 0.75rem; color: var(--text-subtle); font-weight: normal;">(Optional)</span>
+                </label>
+                <span class="badge" style="background: rgba(56, 189, 248, 0.12); color: var(--accent-sky); font-size: 0.7rem; font-weight: 500; border: 1px solid rgba(56, 189, 248, 0.25);">Priority Overrides</span>
+              </div>
+              <p style="font-size: 0.75rem; color: var(--text-subtle); margin-bottom: 8px;">
+                Provide agent-specific instructions. Any prompt provided takes top priority during execution.
+              </p>
+
+              <!-- Segmented Controls for Agent Selection -->
+              <div class="segmented-control aux-segmented">
+                <button type="button" id="btn-aux-recruiter" class="segmented-btn active" onclick="setAuxAgentMode('recruiter')">
+                  Recruiter <span id="dot-aux-recruiter" class="aux-dot" style="display: none;"></span>
+                </button>
+                <button type="button" id="btn-aux-rewriter" class="segmented-btn" onclick="setAuxAgentMode('rewriter')">
+                  Re-writer <span id="dot-aux-rewriter" class="aux-dot" style="display: none;"></span>
+                </button>
+                <button type="button" id="btn-aux-referral" class="segmented-btn" onclick="setAuxAgentMode('referral')">
+                  Referral <span id="dot-aux-referral" class="aux-dot" style="display: none;"></span>
+                </button>
+                <button type="button" id="btn-aux-general" class="segmented-btn" onclick="setAuxAgentMode('general')">
+                  General <span id="dot-aux-general" class="aux-dot" style="display: none;"></span>
+                </button>
+              </div>
+
+              <!-- Recruiter Panel -->
+              <div id="aux-panel-recruiter" class="aux-panel active">
+                <textarea id="input-aux-recruiter" class="form-textarea" style="min-height: 75px; resize: vertical;" placeholder="e.g. Treat abstract systems engineering as transferable to storage engine; focus on Staff-level system design depth; prioritize Kafka/cloud..." oninput="updateAuxIndicators()"></textarea>
+                <div class="aux-hint">Guides the Recruiter agent's qualification audit and match tier calibration.</div>
+              </div>
+
+              <!-- Rewriter Panel -->
+              <div id="aux-panel-rewriter" class="aux-panel" style="display: none;">
+                <textarea id="input-aux-rewriter" class="form-textarea" style="min-height: 75px; resize: vertical;" placeholder="e.g. Heavily emphasize AWS & Kubernetes metrics; maintain concise senior tone; target a 1-page condensed layout..." oninput="updateAuxIndicators()"></textarea>
+                <div class="aux-hint">Guides how accomplishments, XYZ bullet points, and action verbs are tailored.</div>
+              </div>
+
+              <!-- Referral Panel -->
+              <div id="aux-panel-referral" class="aux-panel" style="display: none;">
+                <textarea id="input-aux-referral" class="form-textarea" style="min-height: 75px; resize: vertical;" placeholder="e.g. Keep message under 75 words; mention our mutual connection at Stripe; adopt an energetic and direct peer-to-peer tone..." oninput="updateAuxIndicators()"></textarea>
+                <div class="aux-hint">Guides the cold outreach / internal referral note generated for LinkedIn or email.</div>
+              </div>
+
+              <!-- General Fallback Panel -->
+              <div id="aux-panel-general" class="aux-panel" style="display: none;">
+                <textarea id="input-aux-general" class="form-textarea" style="min-height: 75px; resize: vertical;" placeholder="e.g. Focus on backend systems; preserve technical fidelity..." oninput="updateAuxIndicators()"></textarea>
+                <div class="aux-hint">Applied across all agents if an agent-specific instruction is left blank.</div>
+              </div>
             </div>
 
             <!-- Advanced Run Options Accordion -->
