@@ -14,21 +14,17 @@ class MatchTier(str, Enum):
     HIGH_MATCH = "High Match"
     PERFECT_MATCH = "Perfect Match"
 
-
 class RecruiterVerdict(BaseModel):
-    match_tier: MatchTier = Field(
-        ...,
-        description="Categorical tier: 'Irrelevant', 'Low Match', 'Average Match', 'High Match', or 'Perfect Match'."
-    )
+    match_tier: MatchTier = Field(..., description="Categorical tier: 'Irrelevant', 'Low Match', 'Average Match', 'High Match', or 'Perfect Match'.")
     strengths: List[str] = Field(..., description="Verified matching qualifications and transferable architectural competencies.")
     gaps: List[str] = Field(..., description="Genuine hard technical gaps or non-negotiable requirements completely absent from the candidate's foundation.")
     suggestions: List[str] = Field(..., description="Actionable rewording and semantic bridging guidance for the Re-writer.")
-    is_qualified: bool = Field(
-        ...,
-        description="True ONLY if match_tier is 'High Match' or 'Perfect Match'. Otherwise False."
+    items_to_prune: List[str] = Field(
+        default_factory=list,
+        description="Explicit bullet points, peripheral achievements, or irrelevant course projects that should be dropped to keep the resume concise."
     )
+    is_qualified: bool = Field(..., description="True ONLY if match_tier is 'High Match' or 'Perfect Match'. Otherwise False.")
     summary: str = Field(..., description="A blunt, faithful 2-3 sentence verdict evaluating transferable technical alignment.")
-
 
 RECRUITER_PROMPT = ChatPromptTemplate.from_messages([
     ("system", """You are an elite, insightful Principal Tech Recruiter and Systems Architect.
@@ -106,11 +102,16 @@ def recruiter_node(state: AgentState) -> Dict[str, Any]:
         "auxiliary_instructions": aux_instructions
     })
 
+    pruning_notes = verdict.items_to_prune
+    combined_suggestions = list(verdict.suggestions)
+    if pruning_notes:
+        combined_suggestions.append("PRUNING DIRECTIVE: Drop or compress these non-relevant items: " + "; ".join(pruning_notes))
+
     return {
         "match_tier": verdict.match_tier.value,
         "strengths": verdict.strengths,
         "gaps": verdict.gaps,
-        "suggestions": verdict.suggestions,
+        "suggestions": combined_suggestions,
         "is_qualified": verdict.is_qualified,
         "recruiter_verdict": f"[{verdict.match_tier.value.upper()}] {verdict.summary}"
     }
