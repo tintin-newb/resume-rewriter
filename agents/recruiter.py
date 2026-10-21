@@ -6,7 +6,6 @@ from langchain_core.prompts import ChatPromptTemplate
 from config.settings import settings
 from agents.state import AgentState
 
-
 class MatchTier(str, Enum):
     IRRELEVANT = "Irrelevant"
     LOW_MATCH = "Low Match"
@@ -14,63 +13,81 @@ class MatchTier(str, Enum):
     HIGH_MATCH = "High Match"
     PERFECT_MATCH = "Perfect Match"
 
+
 class RecruiterVerdict(BaseModel):
-    match_tier: MatchTier = Field(..., description="Categorical tier: 'Irrelevant', 'Low Match', 'Average Match', 'High Match', or 'Perfect Match'.")
-    strengths: List[str] = Field(..., description="Verified matching qualifications and transferable architectural competencies.")
-    gaps: List[str] = Field(..., description="Genuine hard technical gaps or non-negotiable requirements completely absent from the candidate's foundation.")
-    suggestions: List[str] = Field(..., description="Actionable rewording and semantic bridging guidance for the Re-writer.")
-    items_to_prune: List[str] = Field(
-        default_factory=list,
-        description="Explicit bullet points, peripheral achievements, or irrelevant course projects that should be dropped to keep the resume concise."
+    match_tier: MatchTier = Field(
+        ...,
+        description="Categorical tier: 'Irrelevant', 'Low Match', 'Average Match', 'High Match', or 'Perfect Match'."
     )
+    is_already_concise: bool = Field(
+        ...,
+        description="True ONLY if the resume is already punchy, dense, and has zero filler. False if it contains low-signal, peripheral, or bloated items."
+    )
+    sections_or_bullets_to_drop: List[str] = Field(
+        default_factory=list,
+        description="Specific low-impact sections, obsolete undergraduate activities, or off-target bullets to DROP completely. Leave empty ONLY if is_already_concise is True."
+    )
+    reordering_priority: List[str] = Field(
+        ...,
+        description="Explicit reordering directives: which specific bullets/projects must be moved to rank #1 and #2 within their sections to hook the recruiter in 6 seconds."
+    )
+    rewording_suggestions: List[str] = Field(
+        ...,
+        description="Pointers that need stronger action verbs, quantified scale, or technical translation."
+    )
+    strengths: List[str] = Field(..., description="Verified matching qualifications and transferable architectural competencies.")
+    gaps: List[str] = Field(..., description="Genuine technical gaps against mandatory JD requirements.")
     is_qualified: bool = Field(..., description="True ONLY if match_tier is 'High Match' or 'Perfect Match'. Otherwise False.")
     summary: str = Field(..., description="A blunt, faithful 2-3 sentence verdict evaluating transferable technical alignment.")
 
+
 RECRUITER_PROMPT = ChatPromptTemplate.from_messages([
-    ("system", """You are an elite, insightful Principal Tech Recruiter and Systems Architect.
-Your job is to objectively evaluate candidate alignment against a Job Description into one of FIVE CATEGORIES.
+    ("system", """You are an elite, uncompromising Principal Tech Recruiter and Systems Architect.
+Your job is to evaluate candidate alignment against a Job Description into one of FIVE CATEGORIES, and provide high-impact layout and structural guidance.
 
-CORE PHILOSOPHY: ARCHITECTURAL & FUNCTIONAL EQUIVALENCE > EXACT KEYWORD MATCHING
-Modern software and ML systems share universal engineering patterns across industries. Do NOT evaluate like a naive keyword scanner. Evaluate based on:
-1. Technical Complexity & Depth: (e.g., Building a distributed, fault-tolerant stream load balancer across 27 servers is functionally equivalent to building high-throughput microservices for financial or e-commerce event streams).
-2. Model & Inference Mechanics: (e.g., Fine-tuning Qwen2-VL with LoRA and optimizing vLLM for 10× throughput solves the exact same low-latency serving problems as serving LLMs for text moderation, catalog enrichment, or search).
-3. Retrieval & Reasoning Systems: (e.g., Deploying multimodal vector search with Qdrant or building LangGraph agentic triage directly transfers to enterprise RAG, catalog search, or customer review summarization).
-4. Macro-Domain Fluency: (e.g., Experience in global travel distribution/GDS at Sabre directly transfers to travel OTAs like Expedia, even if the sub-teams differed).
+1. CORE PHILOSOPHY: ARCHITECTURAL & FUNCTIONAL EQUIVALENCE > EXACT KEYWORD MATCHING
+Evaluate based on systems complexity, transferable model serving/inference, and scale rather than superficial keywords.
 
-EVALUATION TIERS & CALIBRATION:
-1. "Irrelevant":
-   - The candidate's discipline is fundamentally disconnected (e.g., manual graphic designer or non-technical role applying for an MLE position).
+2. THE "6-SECOND RECRUITER SCAN" (SIGNAL-TO-NOISE AUDIT):
+A recruiter spends 6 seconds scanning a resume. Irrelevant or low-impact filler actively damages the candidate by pushing high-value achievements below the fold.
 
-2. "Low Match":
-   - The candidate lacks both the specific domain AND the underlying architectural foundation.
-   - Example: A script-writer who only knows basic Python scripting applying for a Senior Distributed Systems / ML Systems role requiring distributed consensus, GPU acceleration, and low-latency C++ runtimes.
+AUDIT FOR DENSITY VS. BLOAT:
+- Low-Signal Fillers to Flag for DROPPING:
+  * Outdated undergraduate hackathons, intra-college coding competitions, or student clubs.
+  * Routine departmental responsibilities (e.g., student companion/freshers onboarding) if applying for mid/senior engineering roles.
+  * Secondary academic projects that have zero relevance to the target JD.
+  * Passive or redundant bullet points that dilute core achievements.
 
-3. "Average Match":
-   - The candidate has solid technical foundations, but their experience is in an adjacent discipline that would require notable ramp-up on core tools or domain deliverables.
+CONDITIONAL ACTION RULE:
+- IF THE RESUME CONTAINS BLOAT (is_already_concise = False):
+  * You MUST populate `sections_or_bullets_to_drop` with specific pointers or sections to eliminate entirely.
+- IF THE RESUME IS ALREADY CONCISE & DENSE (is_already_concise = True):
+  * Set `sections_or_bullets_to_drop` to an empty list.
+  * Focus 100% of suggestions on REORDERING and REWORDING.
 
-4. "High Match":
-   - Strong candidate. The candidate demonstrates proven mastery of the UNDERLYING TECHNICAL COMPLEXITY and production stack demanded by the JD (e.g., distributed inference, vector databases, microservices, model optimization), even if their previous application domain (e.g., defense, smart cities, travel) differed from the hiring company's product.
-   - The candidate can step into the role and solve the team's engineering bottlenecks with minimal ramp-up.
+3. REORDERING & HIERARCHY DIRECTIVES (ALWAYS REQUIRED):
+- The first 2 bullet points under EVERY job or project determine whether the candidate gets shortlisted.
+- In `reordering_priority`, specify exactly which bullet points must be moved to the TOP of their section because they align most closely with the JD's core technical priorities.
 
-5. "Perfect Match":
-   - Rare fit. Meets 100% of technical requirements with exact, identical industry and product-level experience.
-
-EVALUATION DIRECTIVE:
-- DO NOT penalize a candidate simply because their past titles or industry verticals differ from the hiring company, provided they possess direct mastery of the required models, architectures, frameworks, and engineering scale.
-- Look beyond surface-level wording to identify transferable engineering competence.
+4. EVALUATION TIERS:
+- "Irrelevant": Fundamentally disconnected field.
+- "Low Match": Lacks core technical depth and underlying architectural foundations.
+- "Average Match": Foundational skills present, but significant gaps in core tooling or domain deliverables.
+- "High Match": Proven mastery of underlying technical complexity, models, and scale required by JD. Minor gaps only.
+- "Perfect Match": 100% technical and domain match.
 
 CRITICAL - USER AUXILIARY INSTRUCTIONS (HIGHEST PRIORITY OVERRIDE):
 {auxiliary_instructions}
 
 PRIORITY DIRECTIVE:
-If user auxiliary instructions are provided above, they take ABSOLUTE PRECEDENCE and HIGHEST PRIORITY over standard calibration principles whenever a conflict arises."""),
+User instructions take ABSOLUTE PRECEDENCE over standard rules whenever a conflict arises."""),
     ("user", """--- JOB DESCRIPTION ---
 {job_description}
 
 --- CANDIDATE RESUME ---
 {current_resume}
 
-Evaluate the candidate based on architectural and skill equivalence. Select the categorical match_tier and provide the audit schema now.""")
+Audit the resume for architectural equivalence, conciseness, and visual hierarchy. Return the structured audit schema now.""")
 ])
 
 
@@ -93,7 +110,7 @@ def recruiter_node(state: AgentState) -> Dict[str, Any]:
     elif general_inst:
         aux_instructions = general_inst
     else:
-        aux_instructions = "None provided. Apply standard transferable equivalence evaluation."
+        aux_instructions = "None provided. Enforce strict 6-second scan conciseness and visual prioritization."
 
     chain = RECRUITER_PROMPT | llm
     verdict: RecruiterVerdict = chain.invoke({
@@ -102,16 +119,31 @@ def recruiter_node(state: AgentState) -> Dict[str, Any]:
         "auxiliary_instructions": aux_instructions
     })
 
-    pruning_notes = verdict.items_to_prune
-    combined_suggestions = list(verdict.suggestions)
-    if pruning_notes:
-        combined_suggestions.append("PRUNING DIRECTIVE: Drop or compress these non-relevant items: " + "; ".join(pruning_notes))
+    # Package structured suggestions into unambiguous directives for the Re-writer
+    structured_suggestions: List[str] = []
+
+    if not verdict.is_already_concise and verdict.sections_or_bullets_to_drop:
+        structured_suggestions.append(
+            "PRUNING DIRECTIVE (DELETE THESE TO INCREASE IMPACT): " + " | ".join(verdict.sections_or_bullets_to_drop)
+        )
+    else:
+        structured_suggestions.append("CONCISENESS DIRECTIVE: Resume is dense. Do not delete core sections; focus on prioritizing and rewording.")
+
+    if verdict.reordering_priority:
+        structured_suggestions.append(
+            "REORDERING DIRECTIVE (MOVE TO TOP OF SECTIONS): " + " | ".join(verdict.reordering_priority)
+        )
+
+    if verdict.rewording_suggestions:
+        structured_suggestions.append(
+            "REWORDING DIRECTIVE: " + " | ".join(verdict.rewording_suggestions)
+        )
 
     return {
         "match_tier": verdict.match_tier.value,
         "strengths": verdict.strengths,
         "gaps": verdict.gaps,
-        "suggestions": combined_suggestions,
+        "suggestions": structured_suggestions,
         "is_qualified": verdict.is_qualified,
-        "recruiter_verdict": f"[{verdict.match_tier.value.upper()}] {verdict.summary}"
+        "recruiter_verdict": f"[{verdict.match_tier.value.upper()}] (Concise: {verdict.is_already_concise}) {verdict.summary}"
     }

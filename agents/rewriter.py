@@ -4,10 +4,7 @@ from langchain_ollama import ChatOllama
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from config.settings import settings
-try:
-    from config.action_verbs import get_formatted_action_verbs_prompt
-except ImportError:
-    from config.actions_verbs import get_formatted_action_verbs_prompt
+from config.action_verbs import get_formatted_action_verbs_prompt
 from agents.state import AgentState
 
 
