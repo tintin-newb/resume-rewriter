@@ -123,21 +123,18 @@ def recruiter_node(state: AgentState) -> Dict[str, Any]:
     structured_suggestions: List[str] = []
 
     if not verdict.is_already_concise and verdict.sections_or_bullets_to_drop:
-        structured_suggestions.append(
-            "PRUNING DIRECTIVE (DELETE THESE TO INCREASE IMPACT): " + " | ".join(verdict.sections_or_bullets_to_drop)
-        )
+        prune_items = "\n".join(f"  - [DELETE]: {item}" for item in verdict.sections_or_bullets_to_drop)
+        structured_suggestions.append(f"PRUNING CHECKLIST (YOU MUST REMOVE ALL OF THESE):\n{prune_items}")
     else:
         structured_suggestions.append("CONCISENESS DIRECTIVE: Resume is dense. Do not delete core sections; focus on prioritizing and rewording.")
 
     if verdict.reordering_priority:
-        structured_suggestions.append(
-            "REORDERING DIRECTIVE (MOVE TO TOP OF SECTIONS): " + " | ".join(verdict.reordering_priority)
-        )
+        reorder_items = "\n".join(f"  - [MOVE TO TOP]: {item}" for item in verdict.reordering_priority)
+        structured_suggestions.append(f"REORDERING CHECKLIST (PROMOTE TO #1 AND #2 IN SECTION):\n{reorder_items}")
 
     if verdict.rewording_suggestions:
-        structured_suggestions.append(
-            "REWORDING DIRECTIVE: " + " | ".join(verdict.rewording_suggestions)
-        )
+        reword_items = "\n".join(f"  - {item}" for item in verdict.rewording_suggestions)
+        structured_suggestions.append(f"REWORDING GUIDELINES:\n{reword_items}")
 
     return {
         "match_tier": verdict.match_tier.value,

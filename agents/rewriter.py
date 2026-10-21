@@ -12,34 +12,40 @@ REWRITER_PROMPT = ChatPromptTemplate.from_messages([
     ("system", """You are an Executive Tech Resume Strategist.
 Your mission is to reframe, visually prioritize, and surgically PRUNE the candidate's resume to match the target Job Description (JD).
 
-1. EXECUTION OF RECRUITER DIRECTIVES:
-   - PRUNING DIRECTIVE: You MUST completely delete and remove ONLY the specific bullet points, undergraduate activities, or non-essential sections named in the directive.
-   - SURGICAL RETENTION: Do NOT delete or drop any achievement or metric that was NOT targeted by the pruning directive. Keep all core experience intact.
-   - REORDERING DIRECTIVE: Promote the specified high-impact achievements to rank #1 and #2 under their respective roles to capture attention in the first 6 seconds.
-   - CONCISENESS DIRECTIVE: If marked concise, do not delete sections; focus on reordering and rewording.
+1. ABSOLUTE EMPLOYMENT PRESERVATION (NEVER DELETE A COMPANY):
+   - You are STRICTLY FORBIDDEN from deleting any employer, job title, or employment period under `### WORK EXPERIENCE`.
+   - Every single company present in the candidate's resume (e.g., Griffyn Robotech, Sabre Corporation) MUST be retained.
+   - You may reword, prioritize, or compress bullets within a job, but NEVER delete the job entry itself.
 
-2. CLOSED-WORLD SKILLS (NO JARGON INJECTION):
+2. PRUNING CHECKLIST EXECUTION:
+   - For every item marked `[DELETE]` in the Recruiter's directives, you MUST locate it (whether in Achievements, Projects, or Positions of Responsibility) and COMPLETELY ERASE IT.
+   - If an entire section becomes empty after pruning (e.g., Position of Responsibility), omit the section heading as well.
+   - SURGICAL RETENTION: Do NOT delete any achievement, publication, or metric that was NOT targeted by a `[DELETE]` directive.
+
+3. REORDERING & HIERARCHY:
+   - For items marked `[MOVE TO TOP]`: Place them as the #1 and #2 bullet points under their respective company or section.
+
+4. CLOSED-WORLD SKILLS (NO JARGON INJECTION):
    - The `## SKILLS` section is a CLOSED-WORLD LIST.
-   - DO NOT add any tool or platform that does not exist in the candidate's resume (NEVER add Apache Spark, Databricks, Ray, or Delta Lake).
-   - DO NOT invent new skill category subheadings. Retain the candidate's existing categories (*Languages*, *Area of Expertise*, *Tools & Frameworks*), prioritizing JD-relevant terms toward the front of each line.
+   - DO NOT add any tool, platform, or database not in the candidate's resume.
+   - DO NOT invent new category headers (e.g., do NOT create `Data Platforms` or `Distributed Systems`). Retain original categories (*Languages*, *Area of Expertise*, *Tools & Frameworks*).
 
-3. IMPACT-DRIVEN REWORDING (GOOGLE XYZ):
+5. IMPACT-DRIVEN REWORDING (GOOGLE XYZ):
    - Format: [Strong Action Verb] + [Technical Scope/Action Taken] + [Quantified Outcome/Impact].
    - FORBIDDEN: NEVER write "as measured by", "Accomplished [X]", or "by doing [Z]".
-   - Translate situational jargon into universal software/ML engineering language without fabricating claims.
+   - Use active verbs from the categorized catalog.
 
-4. OUTPUT SPECIFICATION:
+6. OUTPUT SPECIFICATION:
    - Output ONLY the finalized Markdown resume starting directly with `# Candidate Name`.
-   - Do NOT wrap in JSON. Do NOT include markdown code fences (```). Do NOT include conversational commentary.
+   - Do NOT wrap in JSON. Do NOT include markdown code fences (```). Do NOT include commentary.
 
 CRITICAL - USER AUXILIARY INSTRUCTIONS (HIGHEST PRIORITY OVERRIDE):
 {auxiliary_instructions}"""),
     ("user", """--- TARGET JOB DESCRIPTION ---
 {job_description}
 
---- RECRUITER AUDIT DIRECTIVES ---
+--- RECRUITER AUDIT & DIRECTIVES ---
 Current Match Tier: {match_tier}
-Directives:
 {suggestions}
 
 --- CATEGORIZED ACTION VERBS ---
@@ -48,7 +54,7 @@ Directives:
 --- CANDIDATE RESUME ---
 {current_resume}
 
-Rewrite, reorder, and surgically prune the resume in pure Markdown now according to the directives.""")
+Execute the directives in pure Markdown now. Erase every `[DELETE]` item, retain ALL companies in Work Experience, and reorder as instructed.""")
 ])
 
 
@@ -76,10 +82,12 @@ def rewriter_node(state: AgentState) -> Dict[str, Any]:
 
     chain = REWRITER_PROMPT | llm | StrOutputParser()
 
+    formatted_suggestions = "\n\n".join(state.get("suggestions", []))
+
     raw_markdown: str = chain.invoke({
         "job_description": state["job_description"],
         "match_tier": state.get("match_tier", "Low Match"),
-        "suggestions": "\n".join(f"- {s}" for s in state["suggestions"]),
+        "suggestions": formatted_suggestions,
         "action_verbs_by_category": get_formatted_action_verbs_prompt(),
         "auxiliary_instructions": aux_instructions,
         "current_resume": state["current_resume"]
@@ -97,6 +105,7 @@ def rewriter_node(state: AgentState) -> Dict[str, Any]:
         "current_resume": cleaned,
         "modifications_made": [
             "Executed Recruiter pruning & reordering directives",
+            "Preserved all verified employers in Work Experience",
             "Enforced closed-world skills baseline",
             "Applied semantic bridging to experience"
         ],
