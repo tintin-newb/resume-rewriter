@@ -177,7 +177,7 @@ async function handleGenerateSubmit(e) {
   const referralInst = document.getElementById('input-aux-referral')?.value.trim() || '';
   const generalInst = (document.getElementById('input-aux-general')?.value || document.getElementById('input-auxiliary-instructions')?.value || '').trim();
 
-  const maxLoops = document.getElementById('input-max-loops').value;
+  const maxLoops = document.getElementById('input-max-loops')?.value;
   const force = document.getElementById('check-force').checked;
   const skipBootstrap = document.getElementById('check-skip-bootstrap').checked;
 
@@ -312,7 +312,14 @@ function updatePipelineStatusBadge(text, className) {
 
 function renderStepCard(data) {
   const stepper = document.getElementById('stepper-list');
-  const stepId = `step-${data.step}-${data.data && data.data.round ? data.data.round : 'main'}`;
+  let stepId = `step-${data.step}`;
+  if (data.data && data.data.section_index !== undefined) {
+    stepId += `-${data.data.section_index}`;
+  } else if (data.data && data.data.round) {
+    stepId += `-${data.data.round}`;
+  } else {
+    stepId += '-main';
+  }
 
   let card = document.getElementById(stepId);
   if (!card) {
@@ -332,47 +339,108 @@ function renderStepCard(data) {
     bodyContent = `<div>${data.message || ''}</div>`;
   } else if (data.step === 'ingestion') {
     bodyContent = `<div>${data.message || ''}</div>`;
-  } else if (data.step === 'recruiter') {
+  } else if (data.step === 'extractor') {
+    const d = data.data || {};
+    const sections = d.sections || [];
+    const chipsHtml = sections.map(s => `
+      <div class="section-chip">
+        <span class="chip-tag">${escapeHtml(s.section_type || 'other')}</span>
+        <span>${escapeHtml(s.title || 'Untitled')}</span>
+      </div>
+    `).join('');
+
+    bodyContent = `
+      <div style="font-size: 0.825rem; color: var(--text-muted); margin-bottom: 6px;">
+        Layout normalized and segmented into <strong>${d.total_sections || sections.length}</strong> discrete sections:
+      </div>
+      <div class="section-chips-grid">${chipsHtml}</div>
+    `;
+  } else if (data.step === 'observer') {
+    const d = data.data || {};
+    const action = d.action || 'KEEP_AS_IS';
+    const actionClass = action === 'DROP' ? 'drop' : (action === 'KEEP_AS_IS' ? 'keep' : 'revise');
+    const actionIcon = action === 'DROP' ? '✕' : (action === 'KEEP_AS_IS' ? '✓' : '⚡');
+
+    let actionDesc = '';
+    if (action === 'DROP') {
+      actionDesc = 'Purged low-signal / non-technical section to optimize recruiter scan.';
+    } else if (action === 'KEEP_AS_IS') {
+      actionDesc = 'Verified crisp, high-signal technical credentials. Passed through untouched.';
+    } else {
+      actionDesc = 'Audited for strict 6-second scan impact. Optimization directives issued:';
+    }
+
+    const directives = d.directives || [];
+    const dirHtml = directives.map(dir => `<div class="directive-box">${escapeHtml(dir)}</div>`).join('');
+
+    bodyContent = `
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+        <div style="font-size: 0.85rem; font-weight: 600; color: var(--text-main);">
+          ${escapeHtml(d.section_title || 'Section')}
+          <span style="font-size: 0.72rem; color: var(--text-subtle); margin-left: 6px;">[${escapeHtml(d.section_type || 'other')}]</span>
+        </div>
+        <span class="badge-action ${actionClass}">${actionIcon} ${action}</span>
+      </div>
+      <div style="font-size: 0.8rem; color: var(--text-muted);">${actionDesc}</div>
+      ${dirHtml}
+    `;
+  } else if (data.step === 'rewriter') {
+    const d = data.data || {};
+    bodyContent = `
+      <div style="font-size: 0.8rem; color: var(--text-muted);">
+        Tailored <strong style="color: var(--accent-cyan);">${escapeHtml(d.section_title || 'section')}</strong> content using categorized action verbs, Google XYZ impact framing, and surgical pruning directives.
+      </div>
+    `;
+  } else if (data.step === 'stitcher') {
+    const d = data.data || {};
+    const surviving = d.surviving_count || 0;
+    const total = d.total_count || surviving;
+    const dropped = Math.max(0, total - surviving);
+
+    bodyContent = `
+      <div style="font-size: 0.825rem; color: var(--text-muted);">
+        Assembled candidate header and <strong style="color: var(--accent-emerald);">${surviving}</strong> surviving sections into standardized Markdown document.
+        ${dropped > 0 ? `<span style="color: var(--accent-rose); font-size: 0.75rem; margin-left: 6px;">(${dropped} low-signal section${dropped > 1 ? 's' : ''} purged)</span>` : ''}
+      </div>
+    `;
+  } else if (data.step === 'matcher') {
     const d = data.data || {};
     const tier = d.match_tier || 'Pending';
     const isPass = ['High Match', 'Perfect Match'].includes(tier);
-    const tierClass = isPass ? 'high' : 'average';
+    const tierClass = isPass ? 'high' : (tier === 'Average Match' ? 'average' : (tier === 'Irrelevant' ? 'irrelevant' : 'low'));
 
     const strengthsHtml = (d.strengths || []).map(s => `<li style="color: var(--accent-emerald);">✓ ${escapeHtml(s)}</li>`).join('');
     const gapsHtml = (d.gaps || []).map(g => `<li style="color: var(--accent-rose);">✗ ${escapeHtml(g)}</li>`).join('');
-    const suggHtml = (d.suggestions || []).map(s => `<li>→ ${escapeHtml(s)}</li>`).join('');
 
     bodyContent = `
       <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 8px;">
         <span class="badge-tier ${tierClass}">${tier}</span>
-        <span style="font-size: 0.75rem; color: var(--text-muted);">${d.is_qualified ? 'Meets Minimum Qualifications' : 'Under Minimum Qualifications'}</span>
+        <span style="font-size: 0.75rem; color: var(--text-muted);">${isPass ? 'Meets Interview Shortlist Criteria' : 'Under Minimum Requisition Threshold'}</span>
       </div>
       <div class="verdict-box">${escapeHtml(d.recruiter_verdict || '')}</div>
-      ${strengthsHtml ? `<ul style="list-style: none; margin-top: 8px; font-size: 0.8rem;">${strengthsHtml}</ul>` : ''}
-      ${gapsHtml ? `<ul style="list-style: none; margin-top: 6px; font-size: 0.8rem;">${gapsHtml}</ul>` : ''}
-      ${suggHtml ? `<ul style="list-style: none; margin-top: 6px; font-size: 0.8rem; color: var(--accent-amber);">${suggHtml}</ul>` : ''}
-    `;
-  } else if (data.step === 'rewriter') {
-    const d = data.data || {};
-    const mods = (d.modifications_made || []).map(m => `<li>• ${escapeHtml(m)}</li>`).join('');
-    bodyContent = `
-      <div style="font-size: 0.8rem; color: var(--text-muted);">Accomplishments re-anchored with categorized action verbs:</div>
-      <ul style="list-style: none; margin-top: 6px; font-size: 0.8rem; color: var(--accent-sky);">${mods}</ul>
+      ${strengthsHtml ? `<ul style="list-style: none; margin-top: 8px; font-size: 0.8rem; line-height: 1.5;">${strengthsHtml}</ul>` : ''}
+      ${gapsHtml ? `<ul style="list-style: none; margin-top: 6px; font-size: 0.8rem; line-height: 1.5;">${gapsHtml}</ul>` : ''}
     `;
   } else if (data.step === 'referral') {
     const d = data.data || {};
     bodyContent = `
-      <div class="verdict-box" style="border-left-color: var(--accent-emerald); font-family: var(--font-mono); font-size: 0.8rem;">
-        ${escapeHtml(d.referral_message || 'Referral message drafted.')}
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+        <span style="font-size: 0.75rem; font-weight: 600; color: var(--accent-emerald);">First-Person Outreach Message:</span>
+        <button class="btn-secondary" style="padding: 2px 8px; font-size: 0.72rem;" onclick="copyToClipboard(document.getElementById('${stepId}-ref')?.textContent || '')">Copy</button>
       </div>
+      <div id="${stepId}-ref" class="verdict-box" style="border-left-color: var(--accent-emerald); font-family: var(--font-mono); font-size: 0.8rem; white-space: pre-wrap;">${escapeHtml(d.referral_message || 'Referral message drafted.')}</div>
     `;
   } else if (data.step === 'save_artifacts') {
     const d = data.data || {};
     bodyContent = `
-      <div style="font-size: 0.8rem; color: var(--accent-emerald);">
-        ✓ Optimized resume saved to: <code style="font-family: var(--font-mono);">${escapeHtml(d.saved_file_path || '')}</code>
+      <div style="font-size: 0.8rem; color: var(--accent-emerald); display: flex; align-items: center; justify-content: space-between;">
+        <span>✓ Final tailored resume saved to disk:</span>
+        <span class="badge" style="background: rgba(16, 185, 129, 0.1); color: var(--accent-emerald); font-size: 0.7rem;">${escapeHtml(d.status || 'SAVED')}</span>
       </div>
+      <code style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-main); display: block; margin-top: 4px; word-break: break-all;">${escapeHtml(d.saved_file_path || '')}</code>
     `;
+  } else if (data.step === 'persistence') {
+    bodyContent = `<div style="font-size: 0.8rem; color: var(--accent-cyan);">${data.message || 'Run artifacts persisted to PostgreSQL.'}</div>`;
   } else {
     bodyContent = `<div>${data.message || ''}</div>`;
   }
@@ -498,7 +566,7 @@ function renderHistoryItems(items, reset) {
 
     const tier = item.match_tier || 'Pending';
     const isPass = ['High Match', 'Perfect Match'].includes(tier);
-    const tierClass = isPass ? 'high' : 'average';
+    const tierClass = isPass ? 'high' : (tier === 'Average Match' ? 'average' : (tier === 'Irrelevant' ? 'irrelevant' : 'low'));
     const updatedTime = item.updated_at ? new Date(item.updated_at).toLocaleDateString() : '';
     const hasReferral = Boolean(item.referral_message && item.referral_message.trim());
 
@@ -578,7 +646,7 @@ async function openDetailModal(appId, initialMode = 'rewritten') {
     const isPass = ['High Match', 'Perfect Match'].includes(tier);
     const tierBadge = document.getElementById('modal-match-tier');
     tierBadge.textContent = tier;
-    tierBadge.className = `badge-tier ${isPass ? 'high' : 'average'}`;
+    tierBadge.className = `badge-tier ${isPass ? 'high' : (tier === 'Average Match' ? 'average' : (tier === 'Irrelevant' ? 'irrelevant' : 'low'))}`;
 
     document.getElementById('modal-recruiter-verdict').textContent = record.recruiter_verdict || 'No verdict recorded for this run.';
 
@@ -848,8 +916,10 @@ async function loadConfig() {
     document.getElementById('cfg-pg-user').value = s.POSTGRES_USER || '';
     document.getElementById('cfg-pg-pass').value = s.POSTGRES_PASSWORD || '';
     document.getElementById('cfg-max-loops').value = s.MAX_LOOPS || 3;
-    document.getElementById('cfg-rewriter-temp').value = s.REWRITER_TEMP !== undefined ? s.REWRITER_TEMP : 0.2;
+    document.getElementById('cfg-rewriter-temp').value = s.REWRITER_TEMP !== undefined ? s.REWRITER_TEMP : 0.1;
     document.getElementById('cfg-recruiter-temp').value = s.RECRUITER_TEMP !== undefined ? s.RECRUITER_TEMP : 0.0;
+    const refTempInput = document.getElementById('cfg-referral-temp');
+    if (refTempInput) refTempInput.value = s.REFERRAL_TEMP !== undefined ? s.REFERRAL_TEMP : 0.2;
 
   } catch (err) {
     console.warn('Failed to load system config', err);
@@ -865,9 +935,10 @@ async function saveSystemConfig() {
     POSTGRES_DB: document.getElementById('cfg-pg-db').value.trim(),
     POSTGRES_USER: document.getElementById('cfg-pg-user').value.trim(),
     POSTGRES_PASSWORD: document.getElementById('cfg-pg-pass').value,
-    MAX_LOOPS: parseInt(document.getElementById('cfg-max-loops').value) || 3,
-    REWRITER_TEMP: parseFloat(document.getElementById('cfg-rewriter-temp').value) || 0.2,
+    MAX_LOOPS: parseInt(document.getElementById('cfg-max-loops')?.value) || 3,
+    REWRITER_TEMP: parseFloat(document.getElementById('cfg-rewriter-temp').value) || 0.1,
     RECRUITER_TEMP: parseFloat(document.getElementById('cfg-recruiter-temp').value) || 0.0,
+    REFERRAL_TEMP: parseFloat(document.getElementById('cfg-referral-temp')?.value) || 0.2,
   };
 
   try {

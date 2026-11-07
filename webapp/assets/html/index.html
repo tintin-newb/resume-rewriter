@@ -147,39 +147,38 @@
 
               <!-- Recruiter Panel -->
               <div id="aux-panel-recruiter" class="aux-panel active">
-                <textarea id="input-aux-recruiter" class="form-textarea" style="min-height: 75px; resize: vertical;" placeholder="e.g. Treat abstract systems engineering as transferable to storage engine; focus on Staff-level system design depth; prioritize Kafka/cloud..." oninput="updateAuxIndicators()"></textarea>
-                <div class="aux-hint">Guides the Recruiter agent's qualification audit and match tier calibration.</div>
+                <textarea id="input-aux-recruiter" class="form-textarea" style="min-height: 75px; resize: vertical;" placeholder="e.g. Focus on Staff-level system design depth; treat industrial automation as transferable to model serving; prioritize Kafka/cloud scale..." oninput="updateAuxIndicators()"></textarea>
+                <div class="aux-hint">Guides the Recruiter-Observer section audit decisions (DROP/KEEP/REVISE) and Matcher holistic qualification evaluation.</div>
               </div>
 
               <!-- Rewriter Panel -->
               <div id="aux-panel-rewriter" class="aux-panel" style="display: none;">
-                <textarea id="input-aux-rewriter" class="form-textarea" style="min-height: 75px; resize: vertical;" placeholder="e.g. Heavily emphasize AWS & Kubernetes metrics; maintain concise senior tone; target a 1-page condensed layout..." oninput="updateAuxIndicators()"></textarea>
-                <div class="aux-hint">Guides how accomplishments, XYZ bullet points, and action verbs are tailored.</div>
+                <textarea id="input-aux-rewriter" class="form-textarea" style="min-height: 75px; resize: vertical;" placeholder="e.g. Heavily emphasize AWS & Kubernetes metrics; strictly preserve all dates/employers; use Google XYZ action-verb formulas..." oninput="updateAuxIndicators()"></textarea>
+                <div class="aux-hint">Guides section rewording, XYZ impact formatting, and verb selection for sections flagged for revision.</div>
               </div>
 
               <!-- Referral Panel -->
               <div id="aux-panel-referral" class="aux-panel" style="display: none;">
-                <textarea id="input-aux-referral" class="form-textarea" style="min-height: 75px; resize: vertical;" placeholder="e.g. Keep message under 75 words; mention our mutual connection at Stripe; adopt an energetic and direct peer-to-peer tone..." oninput="updateAuxIndicators()"></textarea>
-                <div class="aux-hint">Guides the cold outreach / internal referral note generated for LinkedIn or email.</div>
+                <textarea id="input-aux-referral" class="form-textarea" style="min-height: 75px; resize: vertical;" placeholder="e.g. Keep body under 80 words; highlight transferable architecture; adopt an energetic, direct peer-to-peer tone..." oninput="updateAuxIndicators()"></textarea>
+                <div class="aux-hint">Guides the first-person internal referral note generated for LinkedIn or email outreach.</div>
               </div>
 
               <!-- General Fallback Panel -->
               <div id="aux-panel-general" class="aux-panel" style="display: none;">
-                <textarea id="input-aux-general" class="form-textarea" style="min-height: 75px; resize: vertical;" placeholder="e.g. Focus on backend systems; preserve technical fidelity..." oninput="updateAuxIndicators()"></textarea>
+                <textarea id="input-aux-general" class="form-textarea" style="min-height: 75px; resize: vertical;" placeholder="e.g. Prioritize low-latency distributed systems; maintain dense, professional tone across all agents..." oninput="updateAuxIndicators()"></textarea>
                 <div class="aux-hint">Applied across all agents if an agent-specific instruction is left blank.</div>
               </div>
             </div>
 
             <!-- Advanced Run Options Accordion -->
             <div class="accordion-header" onclick="toggleAccordion('advanced-options')">
-              <span>Advanced Run Configuration</span>
+              <span>Advanced Execution Controls</span>
               <span id="accordion-arrow">▼</span>
             </div>
             <div id="advanced-options" class="accordion-body">
-              <div class="form-group">
-                <label class="form-label" for="input-max-loops">Max Rewriter Passes</label>
-                <input type="number" id="input-max-loops" class="form-input" value="3" min="1" max="6">
-              </div>
+              <p style="font-size: 0.775rem; color: var(--text-subtle); margin-bottom: 10px;">
+                Pipeline dynamically parses and optimizes all discrete sections (Skills, Work Experience, Projects, Education) via Section-by-Section Evaluator-Optimizer.
+              </p>
               <div class="form-group" style="display: flex; gap: 20px; align-items: center; margin-top: 6px;">
                 <label style="display: flex; align-items: center; gap: 8px; font-size: 0.8125rem; color: var(--text-muted); cursor: pointer;">
                   <input type="checkbox" id="check-force"> Force re-execution if cached
@@ -310,11 +309,15 @@
         <div class="form-row">
           <div class="form-group">
             <label class="form-label" for="cfg-rewriter-temp">Rewriter Temp</label>
-            <input type="number" id="cfg-rewriter-temp" class="form-input" value="0.2" step="0.1">
+            <input type="number" id="cfg-rewriter-temp" class="form-input" value="0.1" step="0.05">
           </div>
           <div class="form-group">
             <label class="form-label" for="cfg-recruiter-temp">Recruiter Temp</label>
-            <input type="number" id="cfg-recruiter-temp" class="form-input" value="0.0" step="0.1">
+            <input type="number" id="cfg-recruiter-temp" class="form-input" value="0.0" step="0.05">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="cfg-referral-temp">Referral Temp</label>
+            <input type="number" id="cfg-referral-temp" class="form-input" value="0.2" step="0.05">
           </div>
         </div>
       </div>

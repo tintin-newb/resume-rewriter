@@ -110,6 +110,7 @@ body {
   letter-spacing: -0.02em;
   background: linear-gradient(to right, #fff, var(--text-muted));
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
@@ -672,16 +673,103 @@ body {
   border: 1px solid rgba(16, 185, 129, 0.3);
 }
 
-.badge-tier.average, .badge-tier.low {
+.badge-tier.average {
   background: rgba(245, 158, 11, 0.15);
   color: var(--accent-amber);
   border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.badge-tier.low {
+  background: rgba(244, 63, 94, 0.15);
+  color: var(--accent-rose);
+  border: 1px solid rgba(244, 63, 94, 0.3);
+}
+
+.badge-tier.irrelevant {
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--text-muted);
+  border: 1px solid rgba(148, 163, 184, 0.25);
 }
 
 .badge-tier.referral {
   background: rgba(16, 185, 129, 0.12);
   color: var(--accent-emerald);
   border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+/* Observer Action Badges */
+.badge-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.badge-action.drop {
+  background: rgba(244, 63, 94, 0.18);
+  color: var(--accent-rose);
+  border: 1px solid rgba(244, 63, 94, 0.4);
+}
+
+.badge-action.keep {
+  background: rgba(16, 185, 129, 0.18);
+  color: var(--accent-emerald);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.badge-action.revise {
+  background: rgba(245, 158, 11, 0.18);
+  color: var(--accent-amber);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+/* Extractor Section Chips */
+.section-chips-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.section-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: rgba(56, 189, 248, 0.08);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  color: var(--accent-sky);
+  font-family: var(--font-mono);
+}
+
+.section-chip .chip-tag {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  background: rgba(56, 189, 248, 0.18);
+  padding: 1px 4px;
+  border-radius: 3px;
+  color: var(--text-main);
+}
+
+/* Directive Box for Observer Directives */
+.directive-box {
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border-left: 3px solid var(--accent-amber);
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  font-family: var(--font-mono);
+  line-height: 1.5;
+  color: var(--text-muted);
+  white-space: pre-wrap;
 }
 
 .history-referral-box {

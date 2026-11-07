@@ -1,3 +1,4 @@
+# webapp/pipeline_runner.py
 import asyncio
 import json
 import re
@@ -16,7 +17,7 @@ from agents.workflow import build_workflow
 from agents.state import AgentState
 
 # In-memory storage for tasks and their active event streams
-active_tasks: Dict[str, Dict[str, Any]] = {}
+active_tasks: Dict[str, Any] = {}
 
 
 def _json_default(obj: Any) -> Any:
@@ -73,12 +74,11 @@ async def run_pipeline_job(task: PipelineTask):
     url = p.get("url")
     jd_text = p.get("jd_text")
     force = bool(p.get("force", False))
-    max_loops = int(p.get("max_loops") or settings.MAX_LOOPS)
     skip_bootstrap = bool(p.get("skip_bootstrap", False))
     source_resume_path = p.get("source_resume_path")
 
     try:
-        # Step 1: Bootstrap Check
+        # Step 1: Pre-Flight Bootstrap Check
         await task.emit("step", {
             "step": "bootstrap",
             "title": "Pre-Flight System Check",
@@ -92,7 +92,7 @@ async def run_pipeline_job(task: PipelineTask):
             ollama_ok, ollama_msg = bootstrap.check_ollama_and_model()
 
             if not pg_ok or not ollama_ok:
-                err = f"Bootstrap failed. PG: {pg_msg}. Ollama: {ollama_msg}"
+                err = f"Bootstrap verification failed. PostgreSQL: {pg_msg}. Ollama: {ollama_msg}"
                 await task.emit("step", {
                     "step": "bootstrap",
                     "title": "Pre-Flight System Check",
@@ -120,7 +120,13 @@ async def run_pipeline_job(task: PipelineTask):
             "message": f"Checking existing records for {company} ({job_id})..."
         })
 
-        existing = get_existing_application(company=company, job_id=job_id)
+        existing = None
+        try:
+            existing = get_existing_application(company=company, job_id=job_id)
+        except Exception as e:
+            # PostgreSQL error during dedup check is non-fatal if user allowed skip_bootstrap
+            pass
+
         if existing and not force:
             await task.emit("step", {
                 "step": "dedup",
@@ -140,7 +146,7 @@ async def run_pipeline_job(task: PipelineTask):
             "title": "Database Verification",
             "status": "completed",
             "is_cached": False,
-            "message": "Proceeding with fresh optimization pipeline."
+            "message": "Proceeding with fresh modular section-by-section optimization."
         })
 
         # Step 3: Ingestion
@@ -148,7 +154,7 @@ async def run_pipeline_job(task: PipelineTask):
             "step": "ingestion",
             "title": "Parsing Ingested Content",
             "status": "in_progress",
-            "message": "Parsing resume and extracting job description..."
+            "message": "Parsing base resume and extracting job description..."
         })
 
         job_description = ""
@@ -181,7 +187,7 @@ async def run_pipeline_job(task: PipelineTask):
 
         parser = ResumeParser()
         try:
-            base_resume_text = await asyncio.to_thread(parser.parse, resume_path)
+            raw_resume_text = await asyncio.to_thread(parser.parse, resume_path)
         except Exception as e:
             err = f"Failed to parse resume: {str(e)}"
             await task.emit("step", {"step": "ingestion", "status": "failed", "error": err})
@@ -193,7 +199,7 @@ async def run_pipeline_job(task: PipelineTask):
             "step": "ingestion",
             "title": "Content Ingested",
             "status": "completed",
-            "message": f"Resume parsed ({len(base_resume_text)} chars). JD loaded ({len(job_description)} chars)."
+            "message": f"Resume parsed ({len(raw_resume_text)} chars). JD loaded ({len(job_description)} chars)."
         })
 
         # Step 4: State Initialization
@@ -208,21 +214,22 @@ async def run_pipeline_job(task: PipelineTask):
             "role": role,
             "job_url": url,
             "job_description": job_description,
-            "base_resume": base_resume_text,
-            "current_resume": base_resume_text,
+            "raw_resume_text": raw_resume_text,
+            "candidate_header": "",
+            "parsed_sections": [],
             "auxiliary_instructions": auxiliary_instructions or None,
             "recruiter_instructions": recruiter_instructions or None,
             "rewriter_instructions": rewriter_instructions or None,
             "referral_instructions": referral_instructions or None,
-            "iteration": 1,
-            "max_loops": max_loops,
+            "current_section_idx": 0,
+            "processed_sections": [],
+            "final_resume": "",
+            "observer_action": None,
+            "section_directives": [],
             "match_tier": "Pending",
             "strengths": [],
             "gaps": [],
-            "suggestions": [],
-            "is_qualified": False,
             "recruiter_verdict": "",
-            "modifications_made": [],
             "referral_message": None,
             "source_resume_path": str(resume_path.resolve()),
             "saved_file_path": None,
@@ -233,19 +240,10 @@ async def run_pipeline_job(task: PipelineTask):
         workflow = build_workflow()
         final_state = dict(initial_state)
 
-        # Run workflow in worker thread
-        def stream_workflow():
-            events = []
-            for ev in workflow.stream(initial_state):
-                events.append(ev)
-            return events
-
-        # Run synchronously node-by-node or stream via iterator
         def node_stream_generator():
             for ev in workflow.stream(initial_state):
                 yield ev
 
-        loop = asyncio.get_event_loop()
         iterator = node_stream_generator()
 
         while True:
@@ -257,39 +255,95 @@ async def run_pipeline_job(task: PipelineTask):
                 for node_name, node_output in event.items():
                     final_state.update(node_output)
 
-                    if node_name == "recruiter":
-                        tier = node_output.get("match_tier", "Low Match")
+                    if node_name == "extractor":
+                        sections = node_output.get("parsed_sections", [])
+                        sections_summary = [
+                            {"title": s.get("title", ""), "section_type": s.get("section_type", "other")}
+                            for s in sections
+                        ]
                         await task.emit("step", {
-                            "step": "recruiter",
-                            "title": f"Recruiter Audit (Round {final_state.get('iteration', 1)})",
+                            "step": "extractor",
+                            "title": "Resume Layout Normalization & Extraction",
                             "status": "completed",
                             "data": {
-                                "round": final_state.get("iteration", 1),
-                                "match_tier": tier,
-                                "is_qualified": node_output.get("is_qualified", False),
-                                "recruiter_verdict": node_output.get("recruiter_verdict", ""),
-                                "strengths": node_output.get("strengths", [])[:5],
-                                "gaps": node_output.get("gaps", [])[:5],
-                                "suggestions": node_output.get("suggestions", [])[:5]
+                                "total_sections": len(sections),
+                                "sections": sections_summary,
+                                "candidate_header": node_output.get("candidate_header", "")
+                            }
+                        })
+
+                    elif node_name == "observer":
+                        action = node_output.get("observer_action", "KEEP_AS_IS")
+                        idx = final_state.get("current_section_idx", 0)
+                        sections = final_state.get("parsed_sections", [])
+                        sec = sections[idx] if idx < len(sections) else {"title": f"Section {idx + 1}", "section_type": "other"}
+                        directives = node_output.get("section_directives", [])
+                        
+                        await task.emit("step", {
+                            "step": "observer",
+                            "title": f"Observer Audit: {sec.get('title', 'Section')}",
+                            "status": "completed",
+                            "data": {
+                                "section_index": idx,
+                                "total_sections": len(sections),
+                                "section_title": sec.get("title", ""),
+                                "section_type": sec.get("section_type", "other"),
+                                "action": action,
+                                "directives": directives
                             }
                         })
 
                     elif node_name == "rewriter":
-                        round_num = max(1, final_state.get("iteration", 2) - 1)
+                        idx = max(0, final_state.get("current_section_idx", 1) - 1)
+                        sections = final_state.get("parsed_sections", [])
+                        sec = sections[idx] if idx < len(sections) else {"title": f"Section {idx + 1}"}
+                        
                         await task.emit("step", {
                             "step": "rewriter",
-                            "title": f"Re-writer Optimization Pass (Round {round_num})",
+                            "title": f"Section Re-writer: {sec.get('title', 'Section')}",
                             "status": "completed",
                             "data": {
-                                "round": round_num,
-                                "modifications_made": node_output.get("modifications_made", [])
+                                "section_index": idx,
+                                "total_sections": len(sections),
+                                "section_title": sec.get("title", ""),
+                                "processed_count": len(final_state.get("processed_sections", []))
+                            }
+                        })
+
+                    elif node_name == "advance_section":
+                        pass  # Section advance handled cleanly without UI clutter
+
+                    elif node_name == "stitcher":
+                        surviving = len(final_state.get("processed_sections", []))
+                        total = len(final_state.get("parsed_sections", []))
+                        await task.emit("step", {
+                            "step": "stitcher",
+                            "title": "Resume Reassembly & Stitching",
+                            "status": "completed",
+                            "data": {
+                                "surviving_count": surviving,
+                                "total_count": total
+                            }
+                        })
+
+                    elif node_name == "matcher":
+                        tier = node_output.get("match_tier", "Low Match")
+                        await task.emit("step", {
+                            "step": "matcher",
+                            "title": "Recruiter-Matcher Holistic Evaluation",
+                            "status": "completed",
+                            "data": {
+                                "match_tier": tier,
+                                "recruiter_verdict": node_output.get("recruiter_verdict", ""),
+                                "strengths": node_output.get("strengths", [])[:5],
+                                "gaps": node_output.get("gaps", [])[:5]
                             }
                         })
 
                     elif node_name == "referral":
                         await task.emit("step", {
                             "step": "referral",
-                            "title": "Referral Generator",
+                            "title": "Targeted Referral Note Generator",
                             "status": "completed",
                             "data": {
                                 "referral_message": node_output.get("referral_message")
@@ -299,7 +353,7 @@ async def run_pipeline_job(task: PipelineTask):
                     elif node_name == "save_artifacts":
                         await task.emit("step", {
                             "step": "save_artifacts",
-                            "title": "Resume Exported",
+                            "title": "Final Resume Exported",
                             "status": "completed",
                             "data": {
                                 "saved_file_path": node_output.get("saved_file_path"),
@@ -323,12 +377,12 @@ async def run_pipeline_job(task: PipelineTask):
                 "step": "persistence",
                 "title": "PostgreSQL Record Saved",
                 "status": "completed",
-                "message": "Persisted run artifacts, recruiter verdict, and resume paths to database."
+                "message": "Persisted tailored resume, audit verdicts, and match tier to database."
             })
         except Exception as e:
             await task.emit("step", {
                 "step": "persistence",
-                "title": "PostgreSQL Persistence Warning",
+                "title": "PostgreSQL Persistence Notice",
                 "status": "warning",
                 "message": f"Database save warning: {str(e)}"
             })

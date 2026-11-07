@@ -1,3 +1,4 @@
+# run_cli.py
 import sys
 from pathlib import Path
 from typing import Optional
@@ -16,6 +17,28 @@ from agents.state import AgentState
 console = Console()
 
 
+def _parse_instruction(inst: Optional[str]) -> Optional[str]:
+    """Helper to parse an instruction parameter that may be a direct string or file path."""
+    if not inst:
+        return None
+    try:
+        inst_path = Path(inst)
+        if inst_path.is_file():
+            return inst_path.read_text(encoding="utf-8").strip()
+    except OSError:
+        pass
+    return inst.strip()
+
+
+def _get_tier_color(tier: str) -> str:
+    """Returns Rich color string for qualification tier."""
+    if tier in ("High Match", "Perfect Match"):
+        return "green"
+    elif tier == "Average Match":
+        return "yellow"
+    return "red"
+
+
 @click.command()
 @click.option(
     "--resume", "-r",
@@ -27,19 +50,19 @@ console = Console()
     "--company", "-c",
     required=True,
     type=str,
-    help="Name of the hiring company (e.g., 'Stripe')."
+    help="Name of the hiring company (e.g., 'Mastercard')."
 )
 @click.option(
     "--job-id", "-j",
     required=True,
     type=str,
-    help="Unique requisition ID or code (e.g., 'ENG-4021')."
+    help="Unique requisition ID or code (e.g., 'MAS-101')."
 )
 @click.option(
     "--role",
     required=True,
     type=str,
-    help="Target job title (e.g., 'Senior Backend Engineer')."
+    help="Target job title (e.g., 'Senior AI Engineer')."
 )
 @click.option(
     "--url", "-u",
@@ -59,42 +82,35 @@ console = Console()
     default=False,
     help="Force re-execution even if the job posting was already processed in the database."
 )
-
 @click.option(
-    "--max-loops",
-    type=int,
+    "--instructions", "-i",
+    type=str,
     default=None,
-    help=f"Maximum rewriter iterations (default: {settings.MAX_LOOPS})."
+    help="General auxiliary instructions for all agents (text string or path to a .txt file)."
+)
+@click.option(
+    "--recruiter-instructions", "--recruiter-inst",
+    type=str,
+    default=None,
+    help="Specific guidance for Recruiter-Observer and Matcher agents (text string or file path)."
+)
+@click.option(
+    "--rewriter-instructions", "--rewriter-inst",
+    type=str,
+    default=None,
+    help="Specific guidance for Section Re-writer agent (text string or file path)."
+)
+@click.option(
+    "--referral-instructions", "--referral-inst",
+    type=str,
+    default=None,
+    help="Specific guidance for Referral agent (text string or file path)."
 )
 @click.option(
     "--skip-bootstrap",
     is_flag=True,
     default=False,
     help="Skip pre-flight health checks for Ollama and PostgreSQL."
-)
-@click.option(
-    "--instructions", "-i",
-    type=str,
-    default=None,
-    help="General auxiliary instructions applied across all agents (accepts a string or path to a .txt file)."
-)
-@click.option(
-    "--recruiter-instructions", "--recruiter-inst",
-    type=str,
-    default=None,
-    help="Auxiliary instructions specifically for the Recruiter agent (accepts a string or path to a .txt file)."
-)
-@click.option(
-    "--rewriter-instructions", "--rewriter-inst",
-    type=str,
-    default=None,
-    help="Auxiliary instructions specifically for the Re-writer agent (accepts a string or path to a .txt file)."
-)
-@click.option(
-    "--referral-instructions", "--referral-inst",
-    type=str,
-    default=None,
-    help="Auxiliary instructions specifically for the Referral agent (accepts a string or path to a .txt file)."
 )
 def run_cli(
     resume: Path,
@@ -104,7 +120,6 @@ def run_cli(
     url: Optional[str],
     jd_file: Optional[Path],
     force: bool,
-    max_loops: Optional[int],
     instructions: Optional[str],
     recruiter_instructions: Optional[str],
     rewriter_instructions: Optional[str],
@@ -113,12 +128,11 @@ def run_cli(
 ):
     """
     Agentic Resume Rewriter CLI:
-    Evaluates resumes against job descriptions, optimizes using action verbs,
-    and generates high-impact referrals.
+    Decomposed Section-by-Section Evaluator-Optimizer Pipeline.
     """
     console.print(Panel.fit(
-        "[bold cyan]Agentic Resume Rewriter[/bold cyan]\n"
-        "[dim]Evaluator-Optimizer Workflow powered by Ollama & LangGraph[/dim]",
+        "[bold cyan]Agentic Resume Rewriter (Section-by-Section Architecture)[/bold cyan]\n"
+        "[dim]Powered by Local Ollama & LangGraph State Machine[/dim]",
         border_style="cyan"
     ))
 
@@ -129,17 +143,24 @@ def run_cli(
             console.print("[bold red]Bootstrap verification failed. Aborting run.[/bold red]")
             sys.exit(1)
 
-    # --- 2. Database Deduplication & Idempotency Check ---
-    existing = get_existing_application(company=company, job_id=job_id)
+    # --- 2. Database Deduplication Check ---
+    existing = None
+    try:
+        existing = get_existing_application(company=company, job_id=job_id)
+    except Exception as e:
+        console.print(f"[dim yellow]Notice: Database deduplication lookup skipped ({e})[/dim yellow]")
+
     if existing and not force:
+        tier = existing.get("match_tier", "N/A")
+        tier_color = _get_tier_color(tier)
         console.print(Panel(
             f"[bold yellow]Job posting already evaluated![/bold yellow]\n\n"
             f"[bold]Company:[/bold] {existing['company']}\n"
             f"[bold]Job ID:[/bold] {existing['job_id']}\n"
             f"[bold]Role:[/bold] {existing['role']}\n"
-            f"[bold]Last Score:[/bold] {existing['match_score']}/10.0\n"
+            f"[bold]Match Tier:[/bold] [{tier_color}]{tier}[/{tier_color}]\n"
             f"[bold]Status:[/bold] {existing['status']}\n"
-            f"[bold]Saved Resume:[/bold] {existing['rewritten_resume_path']}\n\n"
+            f"[bold]Saved Resume:[/bold] {existing.get('rewritten_resume_path', 'N/A')}\n\n"
             f"[dim]Run with [bold cyan]--force[/bold cyan] to overwrite this record.[/dim]",
             title="[bold yellow]Cached Run Found[/bold yellow]",
             border_style="yellow"
@@ -160,7 +181,7 @@ def run_cli(
         console.print("[bold red]Error:[/bold red] You must supply either [cyan]--url[/cyan] or [cyan]--jd-file[/cyan].")
         sys.exit(1)
 
-    job_description: str = ""
+    job_description = ""
     if url:
         console.print(f"[cyan]Scraping job description from URL:[/cyan] {url}")
         scraper = JDScraper()
@@ -178,134 +199,153 @@ def run_cli(
     console.print(f"[cyan]Parsing base resume:[/cyan] {resume}")
     resume_parser = ResumeParser()
     try:
-        base_resume_text = resume_parser.parse(resume)
+        raw_resume_text = resume_parser.parse(resume)
     except Exception as e:
         console.print(f"[bold red]Failed to parse resume:[/bold red] {str(e)}")
         sys.exit(1)
 
-    # --- 5. State Initialization ---
-    target_max_loops = max_loops if max_loops is not None else settings.MAX_LOOPS
+    # --- Auxiliary Instructions Parsing ---
+    parsed_general = _parse_instruction(instructions)
+    parsed_recruiter = _parse_instruction(recruiter_instructions)
+    parsed_rewriter = _parse_instruction(rewriter_instructions)
+    parsed_referral = _parse_instruction(referral_instructions)
 
-    # --- 6. Parse Auxiliary Instructions (File or Raw String) ---
-    def _parse_inst(val: Optional[str], label: str) -> Optional[str]:
-        if not val:
-            return None
-        inst_p = Path(val)
-        if inst_p.is_file():
-            console.print(f"[cyan]Loading {label} instructions from file:[/cyan] {inst_p}")
-            txt = inst_p.read_text(encoding="utf-8").strip()
-        else:
-            txt = val.strip()
-        preview = txt[:80] + ("..." if len(txt) > 80 else "")
-        console.print(f"[green]Active {label} Guidance:[/green] [dim]\"{preview}\"[/dim]")
-        return txt
-
-    aux_general = _parse_inst(instructions, "General")
-    aux_recruiter = _parse_inst(recruiter_instructions, "Recruiter")
-    aux_rewriter = _parse_inst(rewriter_instructions, "Re-writer")
-    aux_referral = _parse_inst(referral_instructions, "Referral")
-    if aux_general or aux_recruiter or aux_rewriter or aux_referral:
+    if parsed_general:
+        console.print(f"[green]Active General Guidance:[/green] [dim]\"{parsed_general[:80]}...\"[/dim]")
+    if parsed_recruiter:
+        console.print(f"[green]Active Recruiter Guidance:[/green] [dim]\"{parsed_recruiter[:80]}...\"[/dim]")
+    if parsed_rewriter:
+        console.print(f"[green]Active Rewriter Guidance:[/green] [dim]\"{parsed_rewriter[:80]}...\"[/dim]")
+    if parsed_referral:
+        console.print(f"[green]Active Referral Guidance:[/green] [dim]\"{parsed_referral[:80]}...\"[/dim]")
+    if any([parsed_general, parsed_recruiter, parsed_rewriter, parsed_referral]):
         console.print()
 
+    # --- 5. State Initialization ---
     initial_state: AgentState = {
         "company": company,
         "job_id": job_id,
         "role": role,
         "job_url": url,
         "job_description": job_description,
-        "base_resume": base_resume_text,
-        "current_resume": base_resume_text,
-        "auxiliary_instructions": aux_general,
-        "recruiter_instructions": aux_recruiter,
-        "rewriter_instructions": aux_rewriter,
-        "referral_instructions": aux_referral,
-        "iteration": 1,
-        "max_loops": max_loops or settings.MAX_LOOPS,
+        "raw_resume_text": raw_resume_text,
+        "candidate_header": "",
+        "parsed_sections": [],
+        "auxiliary_instructions": parsed_general,
+        "recruiter_instructions": parsed_recruiter,
+        "rewriter_instructions": parsed_rewriter,
+        "referral_instructions": parsed_referral,
+        "current_section_idx": 0,
+        "processed_sections": [],
+        "final_resume": "",
+        "observer_action": None,
+        "section_directives": [],
         "match_tier": "Pending",
         "strengths": [],
         "gaps": [],
-        "suggestions": [],
-        "is_qualified": False,
         "recruiter_verdict": "",
-        "modifications_made": [],
         "referral_message": None,
+        "source_resume_path": str(resume.resolve()),
         "saved_file_path": None,
         "status": "PROCESSING"
     }
 
-    # --- 7. Live Streamed Workflow Execution ---
-    console.print("\n[bold magenta]Compiling & executing LangGraph agent pipeline...[/bold magenta]\n")
+    # --- 6. Workflow Execution (Streamed) ---
+    console.print("[bold magenta]Starting Modular Agent Workflow...[/bold magenta]\n")
     workflow = build_workflow()
-
     final_state = dict(initial_state)
 
-    # Stream real-time node outputs instead of blocking silently
     for event in workflow.stream(initial_state):
         for node_name, node_output in event.items():
             final_state.update(node_output)
 
-            if node_name == "recruiter":
+            if node_name == "extractor":
+                count = len(node_output.get("parsed_sections", []))
+                console.print(f"[bold green]✓ Extraction Node:[/bold green] Successfully parsed resume into [cyan]{count}[/cyan] discrete sections.\n")
+
+            elif node_name == "observer":
+                action = node_output.get("observer_action", "KEEP_AS_IS")
+                action_colors = {"DROP": "red", "KEEP_AS_IS": "green", "REVISE": "yellow"}
+                color = action_colors.get(action, "white")
+                idx = final_state.get("current_section_idx", 0)
+                sections = final_state.get("parsed_sections", [])
+                sec_title = sections[idx]["title"] if idx < len(sections) else f"Section {idx + 1}"
+                
+                action_notes = {
+                    "DROP": "[dim](purged low-signal / non-technical)[/dim]",
+                    "KEEP_AS_IS": "[dim](preserved verbatim)[/dim]",
+                    "REVISE": "[dim](optimization directives generated)[/dim]"
+                }
+                note = action_notes.get(action, "")
+                console.print(f"  [bold cyan]• Observer Auditing:[/bold cyan] {sec_title} ➔ [{color}]{action}[/{color}] {note}")
+
+            elif node_name == "rewriter":
+                idx = max(0, final_state.get("current_section_idx", 1) - 1)
+                sections = final_state.get("parsed_sections", [])
+                sec_title = sections[idx]["title"] if idx < len(sections) else "section"
+                console.print(f"    [dim cyan]↳ Re-writer tailored '{sec_title}' with categorized action verbs.[/dim cyan]")
+
+            elif node_name == "advance_section":
+                pass  # Section increment handled cleanly
+
+            elif node_name == "stitcher":
+                surviving = len(final_state.get("processed_sections", []))
+                total = len(final_state.get("parsed_sections", []))
+                console.print(f"\n[bold green]✓ Stitcher Node:[/bold green] Assembled [cyan]{surviving}[/cyan] of [cyan]{total}[/cyan] sections into final Markdown.\n")
+
+            elif node_name == "matcher":
                 tier = node_output.get("match_tier", "Low Match")
-                is_pass = tier in ["High Match", "Perfect Match"]
-                tier_badge = f"[bold green]{tier}[/bold green]" if is_pass else f"[bold yellow]{tier}[/bold yellow]"
+                tier_color = _get_tier_color(tier)
+                strengths = node_output.get("strengths", [])
+                gaps = node_output.get("gaps", [])
+
+                strengths_text = "\n".join(f"  ✓ {s}" for s in strengths[:4]) if strengths else "  ✓ Strong transferable systems baseline"
+                gaps_text = "\n".join(f"  ✗ {g}" for g in gaps[:3]) if gaps else "  (None identified)"
+                is_shortlisted = tier in ("High Match", "Perfect Match")
 
                 console.print(Panel(
-                    f"[bold]Match Tier:[/bold] {tier_badge}\n"
-                    f"[bold]Meets Core Qualifications:[/bold] {'[green]Yes[/green]' if node_output.get('is_qualified') else '[red]No[/red]'}\n\n"
-                    f"[bold]Recruiter Audit Summary:[/bold]\n{node_output.get('recruiter_verdict', '')}\n\n"
-                    f"[bold green]Top Matching Strengths:[/bold green]\n" + "\n".join(f"  ✓ {s}" for s in node_output.get('strengths', [])[:3]) + "\n\n"
-                    f"[bold red]Critical Gaps Detected:[/bold red]\n" + "\n".join(f"  ✗ {g}" for g in node_output.get('gaps', [])[:3]) + "\n\n"
-                    f"[bold yellow]Directives for Re-writer:[/bold yellow]\n" + "\n".join(f"  → {s}" for s in node_output.get('suggestions', [])[:3]),
-                    title=f"[bold magenta]Node: Recruiter Audit (Round {final_state['iteration']})[/bold magenta]",
+                    f"[bold]Holistic Match Tier:[/bold] [{tier_color}]{tier}[/{tier_color}]\n"
+                    f"[bold]Qualified for Shortlist:[/bold] {'[green]Yes[/green]' if is_shortlisted else '[red]No[/red]'}\n\n"
+                    f"[bold]Recruiter Assessment:[/bold]\n{node_output.get('recruiter_verdict', '')}\n\n"
+                    f"[bold green]Key Strengths:[/bold green]\n{strengths_text}\n\n"
+                    f"[bold red]Key Gaps:[/bold red]\n{gaps_text}",
+                    title="[bold magenta]Node: Recruiter-Matcher Final Screening[/bold magenta]",
                     border_style="magenta"
                 ))
 
-            elif node_name == "rewriter":
-                mods = node_output.get("modifications_made", [])
-                mods_text = "\n".join(f"  • {m}" for m in mods[:4]) if mods else "  • Re-anchored accomplishments using categorized action verbs."
-                round_num = max(1, final_state["iteration"] - 1)
-
-                console.print(Panel(
-                    f"[bold cyan]Action words integrated & accomplishments rewritten:[/bold cyan]\n{mods_text}\n\n"
-                    f"[dim]Altered resume generated (Pass {round_num}/{final_state['max_loops']}). Evaluating next pipeline step...[/dim]",
-                    title=f"[bold cyan]Node: Re-writer Optimization Pass (Round {round_num})[/bold cyan]",
-                    border_style="cyan"
-                ))
-
             elif node_name == "referral":
-                console.print("[bold green]✓ Node: Referral Generator drafted cold outreach message.[/bold green]")
+                console.print("[bold green]✓ Referral Node:[/bold green] Generated targeted first-person reach-out message.")
 
             elif node_name == "save_artifacts":
-                console.print(f"[bold dim]✓ Node: Exported optimized resume to: {node_output.get('saved_file_path')}[/bold dim]\n")
+                console.print(f"[bold dim]✓ Saved artifact to: {node_output.get('saved_file_path')}[/bold dim]\n")
 
-    # --- 8. PostgreSQL Persistence ---
+    # --- 7. PostgreSQL Persistence ---
     try:
         save_application_state(final_state)
         console.print("[green]Successfully persisted run artifacts to PostgreSQL.[/green]\n")
     except Exception as e:
         console.print(f"[red]Database write error:[/red] {str(e)}")
 
-    # --- 8. Final Report Display ---
-    final_tier = final_state.get("match_tier", "Low Match")
-    tier_color = "green" if final_tier in ["High Match", "Perfect Match"] else "yellow"
+    # --- 8. Final Results Display ---
+    final_tier = final_state.get("match_tier", "Pending")
+    tier_color = _get_tier_color(final_tier)
     console.print(Panel(
         f"[bold]Role:[/bold] {role} at {company}\n"
         f"[bold]Final Match Tier:[/bold] [{tier_color}]{final_tier}[/{tier_color}]\n"
-        f"[bold]Status:[/bold] {final_state['status']}\n"
-        f"[bold]Output File:[/bold] {final_state['saved_file_path']}\n\n"
-        f"[bold]Recruiter Verdict:[/bold]\n{final_state['recruiter_verdict']}",
-        title="[bold green]Execution Complete[/bold green]",
+        f"[bold]Status:[/bold] {final_state.get('status', 'COMPLETED')}\n"
+        f"[bold]Output File:[/bold] {final_state.get('saved_file_path', 'N/A')}",
+        title="[bold green]Pipeline Run Complete[/bold green]",
         border_style="green"
     ))
 
     if final_state.get("referral_message"):
         console.print(Panel(
             final_state["referral_message"],
-            title="[bold cyan]Targeted Referral Message[/bold cyan]",
+            title="[bold cyan]Targeted Referral Outreach Note[/bold cyan]",
             border_style="cyan"
         ))
     else:
-        console.print("[yellow]Referral message was not generated because the match score threshold was not reached.[/yellow]")
+        console.print("[dim yellow]Note: Cold referral outreach was not generated because match tier did not meet high-confidence threshold ('High Match' or 'Perfect Match').[/dim yellow]")
 
 
 if __name__ == "__main__":

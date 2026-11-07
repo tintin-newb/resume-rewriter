@@ -10,11 +10,36 @@ APP_HOME_ENV: Path = APP_HOME_DIR / "config.env"
 LEGACY_HOME_ENV: Path = Path.home() / ".resume-rewriter.env"
 
 
+def _ensure_dir(p: Path) -> bool:
+    try:
+        p.mkdir(parents=True, exist_ok=True)
+        return True
+    except OSError:
+        return False
+
+
 def get_active_env_file() -> Path:
     """Returns the primary home configuration env path, initializing if needed."""
-    APP_HOME_DIR.mkdir(parents=True, exist_ok=True)
-    APP_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
-    APP_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    global APP_HOME_DIR, APP_UPLOADS_DIR, APP_OUTPUT_DIR, APP_HOME_ENV
+
+    if not _ensure_dir(APP_HOME_DIR):
+        local_fallback = Path(".resume-rewriter")
+        if _ensure_dir(local_fallback):
+            APP_HOME_DIR = local_fallback.resolve()
+        else:
+            tmp_fallback = Path("/tmp/.resume-rewriter")
+            _ensure_dir(tmp_fallback)
+            APP_HOME_DIR = tmp_fallback
+
+        APP_UPLOADS_DIR = APP_HOME_DIR / "uploads"
+        APP_OUTPUT_DIR = APP_HOME_DIR / "output"
+        APP_HOME_ENV = APP_HOME_DIR / "config.env"
+
+    _ensure_dir(APP_UPLOADS_DIR)
+    _ensure_dir(APP_OUTPUT_DIR)
+
+    if "CRAWL4_AI_BASE_DIRECTORY" not in os.environ:
+        os.environ["CRAWL4_AI_BASE_DIRECTORY"] = str(APP_HOME_DIR)
 
     if LEGACY_HOME_ENV.exists() and not APP_HOME_ENV.exists():
         return LEGACY_HOME_ENV
@@ -28,7 +53,10 @@ def get_active_env_file() -> Path:
         elif example_env.exists():
             APP_HOME_ENV.write_text(example_env.read_text(encoding="utf-8"), encoding="utf-8")
         else:
-            APP_HOME_ENV.touch()
+            try:
+                APP_HOME_ENV.touch()
+            except OSError:
+                pass
 
     return APP_HOME_ENV
 
@@ -76,8 +104,9 @@ def reload_settings() -> Settings:
     global settings
     env_file = get_active_env_file()
     new_settings = Settings(_env_file=(str(env_file), ".env"))
+    valid_fields = set(type(settings).model_fields.keys())
     for k, v in new_settings.model_dump().items():
-        if hasattr(settings, k):
+        if k in valid_fields:
             setattr(settings, k, v)
     return settings
 
