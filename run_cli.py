@@ -1,11 +1,10 @@
-# main.py
+# run_cli.py
 import sys
 from pathlib import Path
 from typing import Optional
 import click
 from rich.console import Console
 from rich.panel import Panel
-from rich.table import Table
 
 from config.settings import settings
 from bootstrap import SystemBootstrap
@@ -16,6 +15,28 @@ from agents.workflow import build_workflow
 from agents.state import AgentState
 
 console = Console()
+
+
+def _parse_instruction(inst: Optional[str]) -> Optional[str]:
+    """Helper to parse an instruction parameter that may be a direct string or file path."""
+    if not inst:
+        return None
+    try:
+        inst_path = Path(inst)
+        if inst_path.is_file():
+            return inst_path.read_text(encoding="utf-8").strip()
+    except OSError:
+        pass
+    return inst.strip()
+
+
+def _get_tier_color(tier: str) -> str:
+    """Returns Rich color string for qualification tier."""
+    if tier in ("High Match", "Perfect Match"):
+        return "green"
+    elif tier == "Average Match":
+        return "yellow"
+    return "red"
 
 
 @click.command()
@@ -65,7 +86,25 @@ console = Console()
     "--instructions", "-i",
     type=str,
     default=None,
-    help="Auxiliary instructions/guidance for agents (text string or path to a .txt file)."
+    help="General auxiliary instructions for all agents (text string or path to a .txt file)."
+)
+@click.option(
+    "--recruiter-instructions", "--recruiter-inst",
+    type=str,
+    default=None,
+    help="Specific guidance for Recruiter-Observer and Matcher agents (text string or file path)."
+)
+@click.option(
+    "--rewriter-instructions", "--rewriter-inst",
+    type=str,
+    default=None,
+    help="Specific guidance for Section Re-writer agent (text string or file path)."
+)
+@click.option(
+    "--referral-instructions", "--referral-inst",
+    type=str,
+    default=None,
+    help="Specific guidance for Referral agent (text string or file path)."
 )
 @click.option(
     "--skip-bootstrap",
@@ -82,6 +121,9 @@ def run_cli(
     jd_file: Optional[Path],
     force: bool,
     instructions: Optional[str],
+    recruiter_instructions: Optional[str],
+    rewriter_instructions: Optional[str],
+    referral_instructions: Optional[str],
     skip_bootstrap: bool
 ):
     """
@@ -102,16 +144,23 @@ def run_cli(
             sys.exit(1)
 
     # --- 2. Database Deduplication Check ---
-    existing = get_existing_application(company=company, job_id=job_id)
+    existing = None
+    try:
+        existing = get_existing_application(company=company, job_id=job_id)
+    except Exception as e:
+        console.print(f"[dim yellow]Notice: Database deduplication lookup skipped ({e})[/dim yellow]")
+
     if existing and not force:
+        tier = existing.get("match_tier", "N/A")
+        tier_color = _get_tier_color(tier)
         console.print(Panel(
             f"[bold yellow]Job posting already evaluated![/bold yellow]\n\n"
             f"[bold]Company:[/bold] {existing['company']}\n"
             f"[bold]Job ID:[/bold] {existing['job_id']}\n"
             f"[bold]Role:[/bold] {existing['role']}\n"
-            f"[bold]Match Tier:[/bold] {existing.get('match_tier', 'N/A')}\n"
+            f"[bold]Match Tier:[/bold] [{tier_color}]{tier}[/{tier_color}]\n"
             f"[bold]Status:[/bold] {existing['status']}\n"
-            f"[bold]Saved Resume:[/bold] {existing['rewritten_resume_path']}\n\n"
+            f"[bold]Saved Resume:[/bold] {existing.get('rewritten_resume_path', 'N/A')}\n\n"
             f"[dim]Run with [bold cyan]--force[/bold cyan] to overwrite this record.[/dim]",
             title="[bold yellow]Cached Run Found[/bold yellow]",
             border_style="yellow"
@@ -155,15 +204,22 @@ def run_cli(
         console.print(f"[bold red]Failed to parse resume:[/bold red] {str(e)}")
         sys.exit(1)
 
-    # --- Auxiliary Instructions ---
-    aux_text = ""
-    if instructions:
-        inst_path = Path(instructions)
-        if inst_path.is_file():
-            aux_text = inst_path.read_text(encoding="utf-8").strip()
-        else:
-            aux_text = instructions.strip()
-        console.print(f"[green]Active Auxiliary Guidance:[/green] [dim]\"{aux_text[:100]}...\"[/dim]\n")
+    # --- Auxiliary Instructions Parsing ---
+    parsed_general = _parse_instruction(instructions)
+    parsed_recruiter = _parse_instruction(recruiter_instructions)
+    parsed_rewriter = _parse_instruction(rewriter_instructions)
+    parsed_referral = _parse_instruction(referral_instructions)
+
+    if parsed_general:
+        console.print(f"[green]Active General Guidance:[/green] [dim]\"{parsed_general[:80]}...\"[/dim]")
+    if parsed_recruiter:
+        console.print(f"[green]Active Recruiter Guidance:[/green] [dim]\"{parsed_recruiter[:80]}...\"[/dim]")
+    if parsed_rewriter:
+        console.print(f"[green]Active Rewriter Guidance:[/green] [dim]\"{parsed_rewriter[:80]}...\"[/dim]")
+    if parsed_referral:
+        console.print(f"[green]Active Referral Guidance:[/green] [dim]\"{parsed_referral[:80]}...\"[/dim]")
+    if any([parsed_general, parsed_recruiter, parsed_rewriter, parsed_referral]):
+        console.print()
 
     # --- 5. State Initialization ---
     initial_state: AgentState = {
@@ -175,10 +231,10 @@ def run_cli(
         "raw_resume_text": raw_resume_text,
         "candidate_header": "",
         "parsed_sections": [],
-        "auxiliary_instructions": aux_text,
-        "recruiter_instructions": None,
-        "rewriter_instructions": None,
-        "referral_instructions": None,
+        "auxiliary_instructions": parsed_general,
+        "recruiter_instructions": parsed_recruiter,
+        "rewriter_instructions": parsed_rewriter,
+        "referral_instructions": parsed_referral,
         "current_section_idx": 0,
         "processed_sections": [],
         "final_resume": "",
@@ -190,6 +246,7 @@ def run_cli(
         "is_qualified": False,
         "recruiter_verdict": "",
         "referral_message": None,
+        "source_resume_path": str(resume.resolve()),
         "saved_file_path": None,
         "status": "PROCESSING"
     }
@@ -197,7 +254,6 @@ def run_cli(
     # --- 6. Workflow Execution (Streamed) ---
     console.print("[bold magenta]Starting Modular Agent Workflow...[/bold magenta]\n")
     workflow = build_workflow()
-
     final_state = dict(initial_state)
 
     for event in workflow.stream(initial_state):
@@ -213,28 +269,46 @@ def run_cli(
                 action_colors = {"DROP": "red", "KEEP_AS_IS": "green", "REVISE": "yellow"}
                 color = action_colors.get(action, "white")
                 idx = final_state.get("current_section_idx", 0)
-                sec_title = final_state["parsed_sections"][idx]["title"] if idx < len(final_state["parsed_sections"]) else "Section"
-                console.print(f"  [bold cyan]• Observer Auditing:[/bold cyan] {sec_title} ➔ [{color}]{action}[/{color}]")
+                sections = final_state.get("parsed_sections", [])
+                sec_title = sections[idx]["title"] if idx < len(sections) else f"Section {idx + 1}"
+                
+                action_notes = {
+                    "DROP": "[dim](purged low-signal / non-technical)[/dim]",
+                    "KEEP_AS_IS": "[dim](preserved verbatim)[/dim]",
+                    "REVISE": "[dim](optimization directives generated)[/dim]"
+                }
+                note = action_notes.get(action, "")
+                console.print(f"  [bold cyan]• Observer Auditing:[/bold cyan] {sec_title} ➔ [{color}]{action}[/{color}] {note}")
 
             elif node_name == "rewriter":
-                console.print("    [dim]↳ Re-writer optimized section content.[/dim]")
+                idx = max(0, final_state.get("current_section_idx", 1) - 1)
+                sections = final_state.get("parsed_sections", [])
+                sec_title = sections[idx]["title"] if idx < len(sections) else "section"
+                console.print(f"    [dim cyan]↳ Re-writer tailored '{sec_title}' with categorized action verbs.[/dim cyan]")
 
             elif node_name == "advance_section":
-                pass  # Section increment handled quietly
+                pass  # Section increment handled cleanly
 
             elif node_name == "stitcher":
                 surviving = len(final_state.get("processed_sections", []))
-                console.print(f"\n[bold green]✓ Stitcher Node:[/bold green] Assembled [cyan]{surviving}[/cyan] surviving sections into final Markdown.\n")
+                total = len(final_state.get("parsed_sections", []))
+                console.print(f"\n[bold green]✓ Stitcher Node:[/bold green] Assembled [cyan]{surviving}[/cyan] of [cyan]{total}[/cyan] sections into final Markdown.\n")
 
             elif node_name == "matcher":
                 tier = node_output.get("match_tier", "Low Match")
-                tier_color = "green" if tier in ["High Match", "Perfect Match"] else "yellow"
+                tier_color = _get_tier_color(tier)
+                strengths = node_output.get("strengths", [])
+                gaps = node_output.get("gaps", [])
+
+                strengths_text = "\n".join(f"  ✓ {s}" for s in strengths[:4]) if strengths else "  ✓ Strong transferable systems baseline"
+                gaps_text = "\n".join(f"  ✗ {g}" for g in gaps[:3]) if gaps else "  (None identified)"
+
                 console.print(Panel(
                     f"[bold]Holistic Match Tier:[/bold] [{tier_color}]{tier}[/{tier_color}]\n"
                     f"[bold]Qualified for Shortlist:[/bold] {'[green]Yes[/green]' if node_output.get('is_qualified') else '[red]No[/red]'}\n\n"
                     f"[bold]Recruiter Assessment:[/bold]\n{node_output.get('recruiter_verdict', '')}\n\n"
-                    f"[bold green]Key Strengths:[/bold green]\n" + "\n".join(f"  ✓ {s}" for s in node_output.get('strengths', [])[:3]) + "\n\n"
-                    f"[bold red]Key Gaps:[/bold red]\n" + "\n".join(f"  ✗ {g}" for g in node_output.get('gaps', [])[:3]),
+                    f"[bold green]Key Strengths:[/bold green]\n{strengths_text}\n\n"
+                    f"[bold red]Key Gaps:[/bold red]\n{gaps_text}",
                     title="[bold magenta]Node: Recruiter-Matcher Final Screening[/bold magenta]",
                     border_style="magenta"
                 ))
@@ -254,12 +328,12 @@ def run_cli(
 
     # --- 8. Final Results Display ---
     final_tier = final_state.get("match_tier", "Pending")
-    tier_color = "green" if final_tier in ["High Match", "Perfect Match"] else "yellow"
+    tier_color = _get_tier_color(final_tier)
     console.print(Panel(
         f"[bold]Role:[/bold] {role} at {company}\n"
         f"[bold]Final Match Tier:[/bold] [{tier_color}]{final_tier}[/{tier_color}]\n"
-        f"[bold]Status:[/bold] {final_state['status']}\n"
-        f"[bold]Output File:[/bold] {final_state['saved_file_path']}",
+        f"[bold]Status:[/bold] {final_state.get('status', 'COMPLETED')}\n"
+        f"[bold]Output File:[/bold] {final_state.get('saved_file_path', 'N/A')}",
         title="[bold green]Pipeline Run Complete[/bold green]",
         border_style="green"
     ))
@@ -270,6 +344,8 @@ def run_cli(
             title="[bold cyan]Targeted Referral Outreach Note[/bold cyan]",
             border_style="cyan"
         ))
+    else:
+        console.print("[dim yellow]Note: Cold referral outreach was not generated because match tier did not meet high-confidence threshold ('High Match' or 'Perfect Match').[/dim yellow]")
 
 
 if __name__ == "__main__":

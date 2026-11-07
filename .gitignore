@@ -5,3 +5,5 @@ data/
 output/
 .env
 **/ollama_storage/
+.resume-rewriter/
+.crawl4ai/

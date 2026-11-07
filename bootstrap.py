@@ -22,15 +22,17 @@ class SystemBootstrap:
         try:
             available_models_resp = self.ollama_client.list()
             # Handle both object attributes and dict responses
-            models_list = (
-                available_models_resp.models 
-                if hasattr(available_models_resp, 'models') 
-                else available_models_resp.get('models', [])
-            )
+            try:
+                models_list = available_models_resp.models
+            except AttributeError:
+                models_list = available_models_resp.get('models', [])
             
             names = []
             for m in models_list:
-                name = m.model if hasattr(m, 'model') else m.get('name') or m.get('model')
+                try:
+                    name = m.model
+                except AttributeError:
+                    name = m.get('name') or m.get('model')
                 if name:
                     names.append(name.split(':')[0])  # Match base tag e.g. qwen2.5
                     names.append(name)                 # Match full tag e.g. qwen2.5:7b

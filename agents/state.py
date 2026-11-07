@@ -39,5 +39,6 @@ class AgentState(TypedDict):
 
     # Referral & Persistence
     referral_message: Optional[str]
+    source_resume_path: Optional[str]
     saved_file_path: Optional[str]
     status: str

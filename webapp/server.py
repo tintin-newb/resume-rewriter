@@ -137,8 +137,9 @@ async def update_config(req: ConfigUpdateRequest):
 async def test_system_connections(payload: Optional[Dict[str, Any]] = None):
     # Optionally test with transient overrides
     if payload:
+        valid_fields = set(type(settings).model_fields.keys())
         for k, v in payload.items():
-            if hasattr(settings, k) and v is not None:
+            if k in valid_fields and v is not None:
                 setattr(settings, k, v)
 
     bootstrap = SystemBootstrap()
