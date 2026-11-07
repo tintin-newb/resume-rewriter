@@ -34,7 +34,6 @@ class AgentState(TypedDict):
     match_tier: str                           # "Irrelevant", "Low Match", ..., "Perfect Match"
     strengths: List[str]
     gaps: List[str]
-    is_qualified: bool
     recruiter_verdict: str
 
     # Referral & Persistence

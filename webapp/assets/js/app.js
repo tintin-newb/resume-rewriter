@@ -415,7 +415,7 @@ function renderStepCard(data) {
     bodyContent = `
       <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 8px;">
         <span class="badge-tier ${tierClass}">${tier}</span>
-        <span style="font-size: 0.75rem; color: var(--text-muted);">${d.is_qualified ? 'Meets Interview Shortlist Criteria' : 'Under Minimum Requisition Threshold'}</span>
+        <span style="font-size: 0.75rem; color: var(--text-muted);">${isPass ? 'Meets Interview Shortlist Criteria' : 'Under Minimum Requisition Threshold'}</span>
       </div>
       <div class="verdict-box">${escapeHtml(d.recruiter_verdict || '')}</div>
       ${strengthsHtml ? `<ul style="list-style: none; margin-top: 8px; font-size: 0.8rem; line-height: 1.5;">${strengthsHtml}</ul>` : ''}

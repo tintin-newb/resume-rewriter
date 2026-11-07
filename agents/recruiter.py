@@ -37,7 +37,6 @@ class RecruiterVerdict(BaseModel):
     )
     strengths: List[str] = Field(..., description="Verified matching qualifications and transferable architectural competencies.")
     gaps: List[str] = Field(..., description="Genuine technical gaps against mandatory JD requirements.")
-    is_qualified: bool = Field(..., description="True ONLY if match_tier is 'High Match' or 'Perfect Match'. Otherwise False.")
     summary: str = Field(..., description="A blunt, faithful 2-3 sentence verdict evaluating transferable technical alignment.")
 
 
@@ -141,6 +140,5 @@ def recruiter_node(state: AgentState) -> Dict[str, Any]:
         "strengths": verdict.strengths,
         "gaps": verdict.gaps,
         "suggestions": structured_suggestions,
-        "is_qualified": verdict.is_qualified,
         "recruiter_verdict": f"[{verdict.match_tier.value.upper()}] (Concise: {verdict.is_already_concise}) {verdict.summary}"
     }

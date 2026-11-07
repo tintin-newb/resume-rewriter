@@ -243,7 +243,6 @@ def run_cli(
         "match_tier": "Pending",
         "strengths": [],
         "gaps": [],
-        "is_qualified": False,
         "recruiter_verdict": "",
         "referral_message": None,
         "source_resume_path": str(resume.resolve()),
@@ -302,10 +301,11 @@ def run_cli(
 
                 strengths_text = "\n".join(f"  ✓ {s}" for s in strengths[:4]) if strengths else "  ✓ Strong transferable systems baseline"
                 gaps_text = "\n".join(f"  ✗ {g}" for g in gaps[:3]) if gaps else "  (None identified)"
+                is_shortlisted = tier in ("High Match", "Perfect Match")
 
                 console.print(Panel(
                     f"[bold]Holistic Match Tier:[/bold] [{tier_color}]{tier}[/{tier_color}]\n"
-                    f"[bold]Qualified for Shortlist:[/bold] {'[green]Yes[/green]' if node_output.get('is_qualified') else '[red]No[/red]'}\n\n"
+                    f"[bold]Qualified for Shortlist:[/bold] {'[green]Yes[/green]' if is_shortlisted else '[red]No[/red]'}\n\n"
                     f"[bold]Recruiter Assessment:[/bold]\n{node_output.get('recruiter_verdict', '')}\n\n"
                     f"[bold green]Key Strengths:[/bold green]\n{strengths_text}\n\n"
                     f"[bold red]Key Gaps:[/bold red]\n{gaps_text}",

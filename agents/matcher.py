@@ -16,13 +16,13 @@ class MatchTier(str, Enum):
 
 
 class FinalMatchVerdict(BaseModel):
+    summary: str = Field(
+        ...,
+        description="A blunt, realistic 2-3 sentence hiring manager assessment explaining the assigned tier."
+    )
     match_tier: MatchTier = Field(
         ...,
         description="Categorical tier based strictly on the evaluation rubric."
-    )
-    is_qualified: bool = Field(
-        ...,
-        description="True ONLY if match_tier is 'High Match' or 'Perfect Match'. Otherwise False."
     )
     strengths: List[str] = Field(
         ...,
@@ -31,10 +31,6 @@ class FinalMatchVerdict(BaseModel):
     gaps: List[str] = Field(
         ...,
         description="Top 2-3 genuine technical gaps or missing seniority requirements against the JD."
-    )
-    summary: str = Field(
-        ...,
-        description="A blunt, realistic 2-3 sentence hiring manager assessment explaining the assigned tier."
     )
 
 
@@ -110,7 +106,6 @@ def matcher_node(state: AgentState) -> Dict[str, Any]:
 
     return {
         "match_tier": verdict.match_tier.value,
-        "is_qualified": verdict.is_qualified,
         "strengths": verdict.strengths,
         "gaps": verdict.gaps,
         "recruiter_verdict": f"[{verdict.match_tier.value.upper()}] {verdict.summary}"

@@ -229,7 +229,6 @@ async def run_pipeline_job(task: PipelineTask):
             "match_tier": "Pending",
             "strengths": [],
             "gaps": [],
-            "is_qualified": False,
             "recruiter_verdict": "",
             "referral_message": None,
             "source_resume_path": str(resume_path.resolve()),
@@ -335,7 +334,6 @@ async def run_pipeline_job(task: PipelineTask):
                             "status": "completed",
                             "data": {
                                 "match_tier": tier,
-                                "is_qualified": node_output.get("is_qualified", False),
                                 "recruiter_verdict": node_output.get("recruiter_verdict", ""),
                                 "strengths": node_output.get("strengths", [])[:5],
                                 "gaps": node_output.get("gaps", [])[:5]
