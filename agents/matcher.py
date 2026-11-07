@@ -1,3 +1,4 @@
+# agents/matcher.py
 from enum import Enum
 from typing import List, Dict, Any
 from pydantic import BaseModel, Field
@@ -16,20 +17,20 @@ class MatchTier(str, Enum):
 
 
 class FinalMatchVerdict(BaseModel):
-    summary: str = Field(
-        ...,
-        description="A blunt, realistic 2-3 sentence hiring manager assessment explaining the assigned tier."
-    )
     match_tier: MatchTier = Field(
         ...,
         description="Categorical tier based strictly on the evaluation rubric."
     )
+    summary: str = Field(
+        default="",  # Prevents pipeline crash if model omits the key
+        description="A blunt, realistic 2-3 sentence hiring manager assessment explaining the assigned tier."
+    )
     strengths: List[str] = Field(
-        ...,
+        default_factory=list,
         description="Top 3-4 genuine matching qualifications and transferable architectural competencies."
     )
     gaps: List[str] = Field(
-        ...,
+        default_factory=list,
         description="Top 2-3 genuine technical gaps or missing seniority requirements against the JD."
     )
 
@@ -38,21 +39,14 @@ MATCHER_SYSTEM_PROMPT = """You are a Principal Technical Recruiter evaluating a 
 Your job is to provide an objective, holistic assessment of whether this candidate should be shortlisted for a technical interview.
 
 EVALUATION TIERS:
-1. "Irrelevant":
-   - Completely unrelated discipline (e.g., Marketing, Sales, or Graphic Design applying for an ML/SWE role).
+1. "Irrelevant": Completely unrelated discipline.
+2. "Low Match": Lacks core technical foundations or has a severe experience deficit (e.g. <50% of required years).
+3. "Average Match": Transferable skills present, but notable gaps in central production deliverables.
+4. "High Match": Proven mastery of underlying technical complexity, models, or systems scale demanded by the JD. Minor gaps are learnable.
+5. "Perfect Match": 100% technical and domain match.
 
-2. "Low Match":
-   - Lacks core technical foundations and possesses neither the primary tools nor transferable architectural equivalents.
-   - Significant experience deficit (commercial experience is less than 50% of the required minimum).
-
-3. "Average Match":
-   - The candidate has adjacent technical skills, but has notable gaps in central production deliverables or core toolchains that will require substantial ramp-up.
-
-4. "High Match":
-   - Strong candidate. The candidate demonstrates proven mastery of the underlying technical complexity, models, or systems scale demanded by the JD (even if previous applications were in a parallel domain). Meets or closely approaches the seniority requirement. Minor gaps are easily learnable on the job.
-
-5. "Perfect Match":
-   - Rare 1:1 Fit: Meets 100% of required and preferred skills with identical domain, stack, and industry experience.
+CRITICAL INSTRUCTION:
+You MUST provide all schema fields: `match_tier`, `summary`, `strengths`, and `gaps`.
 
 USER AUXILIARY INSTRUCTIONS (HIGHEST PRIORITY OVERRIDE):
 {auxiliary_instructions}"""
@@ -63,7 +57,7 @@ MATCHER_USER_PROMPT = """--- TARGET JOB DESCRIPTION ---
 --- FINAL TAILORED CANDIDATE RESUME ---
 {final_resume}
 
-Evaluate the candidate's holistic alignment against the JD. Output the FinalMatchVerdict schema now."""
+Evaluate the candidate's holistic alignment against the JD. Output all fields of the FinalMatchVerdict schema now."""
 
 
 def matcher_node(state: AgentState) -> Dict[str, Any]:
@@ -104,9 +98,17 @@ def matcher_node(state: AgentState) -> Dict[str, Any]:
         "auxiliary_instructions": aux_text,
     })
 
+    # Robust fallback: If summary was left blank by the LLM, synthesize one automatically
+    final_summary = verdict.summary.strip()
+    if not final_summary:
+        if verdict.gaps:
+            final_summary = f"Candidate evaluated as {verdict.match_tier.value}. Key areas of concern: {'; '.join(verdict.gaps[:2])}."
+        else:
+            final_summary = f"Candidate demonstrates alignment evaluated at {verdict.match_tier.value} tier."
+
     return {
         "match_tier": verdict.match_tier.value,
         "strengths": verdict.strengths,
         "gaps": verdict.gaps,
-        "recruiter_verdict": f"[{verdict.match_tier.value.upper()}] {verdict.summary}"
+        "recruiter_verdict": f"[{verdict.match_tier.value.upper()}] {final_summary}"
     }
