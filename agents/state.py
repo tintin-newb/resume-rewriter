@@ -1,4 +1,5 @@
-from typing import TypedDict, List, Optional
+# agents/state.py
+from typing import TypedDict, List, Dict, Optional, Any
 
 
 class AgentState(TypedDict):
@@ -9,35 +10,34 @@ class AgentState(TypedDict):
     job_url: Optional[str]
     job_description: str
 
-    # Resumes
-    base_resume: str
-    current_resume: str
+    # Raw Inputs & Extraction
+    raw_resume_text: str
+    candidate_header: str                     # "# Name \n Email | Phone | LinkedIn"
+    parsed_sections: List[Dict[str, Any]]     # Clean sections extracted by ExtractionAgent
 
-    # User Auxiliary Guidance (General & Agent-Specific)
+    # User Guidance
     auxiliary_instructions: Optional[str]
     recruiter_instructions: Optional[str]
     rewriter_instructions: Optional[str]
     referral_instructions: Optional[str]
 
-    # Loop Controls
-    iteration: int
-    max_loops: int
+    # Pipeline Section Iteration State
+    current_section_idx: int                  # Index pointer for section iteration
+    processed_sections: List[Dict[str, Any]]  # Surviving sections after Observer & Rewriter
+    final_resume: str                         # Final stitched Markdown document
 
-    # Recruiter Categorical Outputs
-    match_tier: str  # "Irrelevant", "Low Match", "Average Match", "High Match", "Perfect Match"
+    # Recruiter-Observer Outputs (Current Section)
+    observer_action: Optional[str]            # "DROP" | "KEEP_AS_IS" | "REVISE"
+    section_directives: List[str]             # Specific suggestions for current section
+
+    # Recruiter-Matcher Outputs (Holistic Evaluation)
+    match_tier: str                           # "Irrelevant", "Low Match", ..., "Perfect Match"
     strengths: List[str]
     gaps: List[str]
-    suggestions: List[str]
     is_qualified: bool
     recruiter_verdict: str
 
-    # Rewriter Outputs
-    modifications_made: List[str]
-
-    # Referral Output
+    # Referral & Persistence
     referral_message: Optional[str]
-
-    # Artifacts & DB State
-    source_resume_path: Optional[str]
     saved_file_path: Optional[str]
     status: str
