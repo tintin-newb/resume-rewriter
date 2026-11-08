@@ -177,7 +177,6 @@ async function handleGenerateSubmit(e) {
   const referralInst = document.getElementById('input-aux-referral')?.value.trim() || '';
   const generalInst = (document.getElementById('input-aux-general')?.value || document.getElementById('input-auxiliary-instructions')?.value || '').trim();
 
-  const wordLimit = document.getElementById('input-word-limit')?.value;
   const force = document.getElementById('check-force').checked;
   const skipBootstrap = document.getElementById('check-skip-bootstrap').checked;
 
@@ -201,7 +200,6 @@ async function handleGenerateSubmit(e) {
   if (rewriterInst) formData.append('rewriter_instructions', rewriterInst);
   if (referralInst) formData.append('referral_instructions', referralInst);
   if (generalInst) formData.append('auxiliary_instructions', generalInst);
-  if (wordLimit) formData.append('word_limit', wordLimit);
   formData.append('force', force);
   formData.append('skip_bootstrap', skipBootstrap);
 
