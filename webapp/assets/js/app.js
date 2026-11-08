@@ -177,7 +177,7 @@ async function handleGenerateSubmit(e) {
   const referralInst = document.getElementById('input-aux-referral')?.value.trim() || '';
   const generalInst = (document.getElementById('input-aux-general')?.value || document.getElementById('input-auxiliary-instructions')?.value || '').trim();
 
-  const maxLoops = document.getElementById('input-max-loops')?.value;
+  const wordLimit = document.getElementById('input-word-limit')?.value;
   const force = document.getElementById('check-force').checked;
   const skipBootstrap = document.getElementById('check-skip-bootstrap').checked;
 
@@ -201,7 +201,7 @@ async function handleGenerateSubmit(e) {
   if (rewriterInst) formData.append('rewriter_instructions', rewriterInst);
   if (referralInst) formData.append('referral_instructions', referralInst);
   if (generalInst) formData.append('auxiliary_instructions', generalInst);
-  if (maxLoops) formData.append('max_loops', maxLoops);
+  if (wordLimit) formData.append('word_limit', wordLimit);
   formData.append('force', force);
   formData.append('skip_bootstrap', skipBootstrap);
 
@@ -915,7 +915,8 @@ async function loadConfig() {
     document.getElementById('cfg-pg-db').value = s.POSTGRES_DB || '';
     document.getElementById('cfg-pg-user').value = s.POSTGRES_USER || '';
     document.getElementById('cfg-pg-pass').value = s.POSTGRES_PASSWORD || '';
-    document.getElementById('cfg-max-loops').value = s.MAX_LOOPS || 3;
+    const wordLimitInput = document.getElementById('cfg-word-limit');
+    if (wordLimitInput) wordLimitInput.value = s.WORD_LIMIT || 30;
     document.getElementById('cfg-rewriter-temp').value = s.REWRITER_TEMP !== undefined ? s.REWRITER_TEMP : 0.1;
     document.getElementById('cfg-recruiter-temp').value = s.RECRUITER_TEMP !== undefined ? s.RECRUITER_TEMP : 0.0;
     const refTempInput = document.getElementById('cfg-referral-temp');
@@ -935,7 +936,7 @@ async function saveSystemConfig() {
     POSTGRES_DB: document.getElementById('cfg-pg-db').value.trim(),
     POSTGRES_USER: document.getElementById('cfg-pg-user').value.trim(),
     POSTGRES_PASSWORD: document.getElementById('cfg-pg-pass').value,
-    MAX_LOOPS: parseInt(document.getElementById('cfg-max-loops')?.value) || 3,
+    WORD_LIMIT: parseInt(document.getElementById('cfg-word-limit')?.value) || 30,
     REWRITER_TEMP: parseFloat(document.getElementById('cfg-rewriter-temp').value) || 0.1,
     RECRUITER_TEMP: parseFloat(document.getElementById('cfg-recruiter-temp').value) || 0.0,
     REFERRAL_TEMP: parseFloat(document.getElementById('cfg-referral-temp')?.value) || 0.2,

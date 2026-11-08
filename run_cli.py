@@ -107,6 +107,12 @@ def _get_tier_color(tier: str) -> str:
     help="Specific guidance for Referral agent (text string or file path)."
 )
 @click.option(
+    "--word-limit", "-w",
+    type=int,
+    default=None,
+    help="Maximum word limit per pointer in the resume (overrides WORD_LIMIT env setting)."
+)
+@click.option(
     "--skip-bootstrap",
     is_flag=True,
     default=False,
@@ -124,6 +130,7 @@ def run_cli(
     recruiter_instructions: Optional[str],
     rewriter_instructions: Optional[str],
     referral_instructions: Optional[str],
+    word_limit: Optional[int],
     skip_bootstrap: bool
 ):
     """
@@ -221,6 +228,9 @@ def run_cli(
     if any([parsed_general, parsed_recruiter, parsed_rewriter, parsed_referral]):
         console.print()
 
+    active_word_limit = word_limit if word_limit is not None else settings.WORD_LIMIT
+    console.print(f"[green]Word Limit per Pointer:[/green] [dim]{active_word_limit} words[/dim]\n")
+
     # --- 5. State Initialization ---
     initial_state: AgentState = {
         "company": company,
@@ -238,6 +248,7 @@ def run_cli(
         "current_section_idx": 0,
         "processed_sections": [],
         "final_resume": "",
+        "word_limit": active_word_limit,
         "observer_action": None,
         "section_directives": [],
         "match_tier": "Pending",

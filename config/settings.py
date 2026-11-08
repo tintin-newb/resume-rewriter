@@ -79,8 +79,8 @@ class Settings(BaseSettings):
     POSTGRES_USER: str = "postgres"
     POSTGRES_PASSWORD: str = ""
 
-    # Pipeline Settings
-    MAX_LOOPS: int = 3
+    # Pipeline & Content Settings
+    WORD_LIMIT: int = 30
     OUTPUT_DIR: Path = APP_OUTPUT_DIR
 
     model_config = SettingsConfigDict(

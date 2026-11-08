@@ -63,12 +63,12 @@ flowchart TD
 
     %% Evaluator-Optimizer Feedback Loop
     REC -->|"Audit Verdict & Tier"| DEC
-    DEC -->|"No (Within Max Loops)"| REW
+    DEC -->|"Needs Revision"| REW
     REW -->|"Tailored Bullets"| REC
 
     %% Workflow Completion
     DEC -->|"Yes (High / Perfect Match)"| REF
-    DEC -->|"Max Loops Reached"| OUT
+    DEC -->|"Audit Complete"| OUT
     REF -->|"Referral Message"| OUT
     OUT -.->|"Persist File Path"| DB
 
@@ -84,7 +84,7 @@ flowchart TD
 - **Ingestion & Parsing (`parsers/` & `scrapers/`)**: `ResumeParser` extracts normalized text from `.pdf`, `.md`, `.txt`, and `.docx` documents. `JDScraper` uses Crawl4AI (headless Chromium) with JSON-LD schema parsing and SPA delay handling to extract clean job postings from career sites or local files.
 - **LangGraph Multi-Agent Core (`agents/`)**: Manages the Evaluator-Optimizer feedback loop via `StateGraph`:
   - **Recruiter Agent (Evaluator):** Deterministically (`temperature = 0`) compares candidate qualifications against JD requirements, producing structured gap analyses, strengths, and a categorical match tier.
-  - **Decision Router (`should_continue`):** Evaluates if the match tier qualifies as passing (`High Match` or `Perfect Match`) or if `max_loops` has been reached.
+  - **Decision Router (`route_matcher_verdict`):** Evaluates if the match tier qualifies as passing (`High Match` or `Perfect Match`) to generate targeted referral outreach.
   - **Re-writer Agent (Optimizer):** Takes recruiter feedback and a curated action verb taxonomy to rewrite bullets using active voice and metrics without fabricating facts (zero-hallucination constraint), then routes back to the Recruiter.
   - **Referral Generator Agent:** When target qualification is reached, drafts an outreach message for LinkedIn or email.
 - **Storage & External Infrastructure**:
@@ -312,8 +312,8 @@ POSTGRES_DB=resume_rewriter_db
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=postgres
 
-# Optimization Loop Guardrails
-MAX_LOOPS=3
+# Content Constraints
+WORD_LIMIT=30
 ```
 
 | Variable | Description |
@@ -321,7 +321,7 @@ MAX_LOOPS=3
 | `OLLAMA_BASE_URL` | Endpoint of the Ollama server (native or container). |
 | `OLLAMA_MODEL` | Local LLM tag (e.g., `qwen2.5:7b`, `qwen2.5:14b`). |
 | `POSTGRES_*` | Connection credentials for the application database. |
-| `MAX_LOOPS` | Circuit breaker limit preventing infinite optimizer iterations. |
+| `WORD_LIMIT` | Maximum word count per pointer in the rewritten resume. |
 
 ---
 
@@ -398,8 +398,8 @@ Options:
                            JD.
   -f, --force              Force re-execution even if the job posting was
                            already processed in the database.
-  --min-score FLOAT        Minimum target score to exit loop (default: 8.0).
-  --max-loops INTEGER      Maximum rewriter iterations (default: 3).
+  -w, --word-limit INTEGER        Maximum word limit per pointer in the resume
+                                  (overrides WORD_LIMIT env setting).
   --skip-bootstrap         Skip pre-flight health checks for Ollama and
                            PostgreSQL.
   -i, --instructions TEXT         General auxiliary instructions applied
@@ -444,8 +444,7 @@ python run_cli.py \
   --job-id "REQ-9920" \
   --role "Staff Infrastructure Engineer" \
   --jd-file "data/stripe_jd.txt" \
-  --min-score 8.5 \
-  --max-loops 2
+  --word-limit 25
 ```
 
 #### Scenario C: Idempotency Caching & Overriding (`--force`)

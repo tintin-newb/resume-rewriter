@@ -27,7 +27,12 @@ CRITICAL SECTION-LEVEL INSTRUCTIONS:
    - FORBIDDEN: NEVER write literal phrases like "as measured by", "Accomplished [X]", or "by doing [Z]".
    - Use active verbs from the categorized catalog provided.
 
-4. OUTPUT SPECIFICATION:
+4. WORD LIMIT PER POINTER (CONCISENESS CONSTRAINT):
+   - Every individual bullet point or pointer MUST NOT exceed {word_limit} words.
+   - Keep each pointer dense, high-impact, and strictly within this {word_limit}-word limit.
+   - Even in case of "KEEP_AS_IS" directive you MUST ensure the word limit constraint is satisfied. If not, reword the pointer 
+
+5. OUTPUT SPECIFICATION:
    - Output ONLY the clean Markdown content for this section.
    - Do NOT include section titles (e.g., do NOT start with `## WORK EXPERIENCE`; only output the internal content).
    - Do NOT wrap in markdown code fences (```). Do NOT include conversational filler.
@@ -89,6 +94,9 @@ def rewriter_node(state: AgentState) -> Dict[str, Any]:
     else:
         aux_text = "None provided. Apply standard impact rewording and surgical pruning."
 
+    # Word limit per pointer constraint
+    word_limit = state.get("word_limit") or settings.WORD_LIMIT
+
     prompt = ChatPromptTemplate.from_messages([
         ("system", SECTION_REWRITER_SYSTEM_PROMPT),
         ("user", SECTION_REWRITER_USER_PROMPT),
@@ -104,6 +112,7 @@ def rewriter_node(state: AgentState) -> Dict[str, Any]:
         "section_type": target_section.get("section_type", "other"),
         "section_content": target_section.get("content", ""),
         "auxiliary_instructions": aux_text,
+        "word_limit": word_limit,
     })
 
     # Clean any accidental outer code block fences
