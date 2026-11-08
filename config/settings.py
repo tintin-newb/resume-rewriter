@@ -80,7 +80,7 @@ class Settings(BaseSettings):
     POSTGRES_PASSWORD: str = ""
 
     # Pipeline & Content Settings
-    WORD_LIMIT: int = 30
+    WORD_LIMIT: int = 20
     OUTPUT_DIR: Path = APP_OUTPUT_DIR
 
     model_config = SettingsConfigDict(
