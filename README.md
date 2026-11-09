@@ -1,24 +1,27 @@
 # Agentic Resume Rewriter
 
-An intelligent, multi-agent CLI application built on the **Evaluator-Optimizer pattern**. It automates ATS resume auditing, iterative resume rewrites using industry-standard action verbs without hallucinations, and high-impact referral reach-out generation.
+An intelligent, multi-agent CLI and Web application built on the **Decomposed Section-by-Section Evaluator-Optimizer pattern**. It automates ATS resume auditing, section-level optimization using industry-standard action verbs and the Google XYZ formula without hallucinations, strict bullet-pointer word limit enforcement, categorical match scoring, and high-impact referral reach-out generation.
 
 ---
 
 ## 1. Introduction
 
-When applying for technical roles, resumes often fail initial automated or human screenings due to passive language, poor visual prioritization, or mismatched phrasing. 
+When applying for technical roles, resumes often fail initial automated or human screenings due to passive language, poor visual prioritization, missing metric framing, or mismatched phrasing. 
 
-The **Agentic Resume Rewriter** addresses this by orchestrating a feedback loop between specialized AI agents powered by local LLMs via Ollama:
-- **Recruiter Agent (The Evaluator):** Acts as a cold, deterministic (`temperature = 0`) ATS screener. It audits candidate alignment against a target Job Description (JD), identifies gaps, highlights strengths, and outputs an objective match score (1–10).
-- **Re-writer Agent (The Optimizer):** Ingests the recruiter's critique and a curated bank of categorized action verbs (parsed from reference PDFs). It iteratively rewrites resume bullet points using active voice, impact metrics, and prioritized ordering—**strictly bound by a zero-hallucination policy** that forbids fabricating experience.
-- **Referral Generator Agent:** Automatically triggers once the match score meets the qualification threshold to draft a concise, high-converting outreach message for LinkedIn or email.
-- **Postgres Persistence & Caching:** Prevents redundant compute by caching application runs by Company and Job ID, supporting a `--force` flag for intentional re-runs.
+The **Agentic Resume Rewriter** addresses this by orchestrating a structured feedback loop between specialized AI agents powered by local LLMs via Ollama:
+- **Extractor Agent:** Parses candidate header details (contact, links) and semantically decomposes the resume into discrete logical sections (Summary, Experience, Projects, Skills, Education).
+- **Recruiter-Observer Agent (Section Evaluator):** Acts as a cold, deterministic (`temperature = 0.0`) ATS section auditor. For each section, it evaluates relevance against target Job Description (JD) criteria, assigns an action (`DROP`, `KEEP_AS_IS`, or `REVISE`), and produces surgical directives (`PRUNE BULLETS`, `REORDER BULLETS`, `REWORDING`). Incorporates adaptive token budgeting (1024 $\to$ 2048 $\to$ 4096 tokens) to reliably parse complex reasoning models without truncation.
+- **Re-writer Agent (Section Optimizer):** Optimizes section bullets using the Google XYZ formula (`Accomplished [X] as measured by [Y], by doing [Z]`), a curated taxonomy of categorized action verbs, a strict zero-hallucination constraint, and strict per-pointer word limit enforcement (`WORD_LIMIT`). In `KEEP_AS_IS` sections, it audits all bullet pointers for word length and sharpens impact while preserving core content.
+- **Stitcher Node:** Recombines the isolated candidate header with all surviving, rewritten sections into a clean, unified Markdown resume.
+- **Recruiter-Matcher Agent (Holistic Evaluator):** Conducts an end-to-end audit of the fully stitched resume against the target JD, assigning a categorical match tier (`Irrelevant`, `Low Match`, `Average Match`, `High Match`, `Perfect Match`), highlighting key strengths, identifying remaining gaps, and providing a comprehensive recruiter verdict.
+- **Referral Generator Agent:** Automatically triggers when the match tier reaches `High Match` or `Perfect Match` to draft a concise, high-converting outreach message under 100 words for LinkedIn or email.
+- **Postgres Persistence & Caching:** Prevents redundant compute by caching application runs by `(Company, Job ID)`, supporting a `--force` flag for intentional re-runs.
 
 ---
 
 ## 2. System Architecture
 
-The following diagram illustrates the main components of the application and how they communicate across ingestion, orchestration, persistence, and local LLM inference:
+The following diagram illustrates the decomposed section-by-section multi-agent architecture across ingestion, section iteration, holistic scoring, persistence, and local LLM inference:
 
 ```mermaid
 flowchart TD
@@ -29,24 +32,31 @@ flowchart TD
     end
 
     %% Ingestion Layer
-    subgraph Ingestion["2. Ingestion & Parsing"]
+    subgraph Ingestion["2. Ingestion & Pre-Processing"]
         RP["Resume Parser<br/>(PDF, MD, TXT, DOCX)"]
         JDS["JD Scraper<br/>(Crawl4AI / BeautifulSoup)"]
     end
 
     %% Core Multi-Agent Orchestration
-    subgraph Agents["3. LangGraph Multi-Agent Core"]
-        REC["Recruiter Agent<br/>(Evaluator, temp = 0)"]
-        DEC{"Target Match<br/>Achieved?"}
-        REW["Re-writer Agent<br/>(Optimizer + Action Verbs)"]
+    subgraph Agents["3. Decomposed Section-by-Section LangGraph Core"]
+        EXT["Extractor Agent<br/>(Header & Section Splitting)"]
+        OBS["Recruiter-Observer<br/>(Section Audit, Adaptive Token Budget)"]
+        ACT{"Section Action?"}
+        REW["Re-writer Agent<br/>(XYZ Formula, Verbs & Word Limit)"]
+        ADV["Advance Section<br/>(Discard Dropped Section)"]
+        MORE{"More Sections?"}
+        STI["Stitcher Node<br/>(Reassemble Markdown Resume)"]
+        MAT["Recruiter-Matcher<br/>(Holistic Match Tier Evaluation)"]
+        TIER{"Match Tier Passing?<br/>(High / Perfect Match)"}
         REF["Referral Generator<br/>(Outreach Draft)"]
+        SAVE["Save Artifacts<br/>(Write Markdown & Status)"]
     end
 
     %% Storage & External Infrastructure
     subgraph Storage["4. Storage & LLM Infrastructure"]
-        OLLAMA[("Ollama LLM Engine<br/>(Local Inference: qwen2.5)")]
+        OLLAMA[("Ollama LLM Engine<br/>(qwen2.5 / qwen3 / Reasoning Toggle)")]
         DB[("PostgreSQL Database<br/>(Run Cache & History)")]
-        OUT["Output Resumes<br/>(output/ & uploads/)"]
+        OUT["Output Storage<br/>(output/ & uploads/)"]
     end
 
     %% Client communication
@@ -58,37 +68,51 @@ flowchart TD
     WEB <-.->|"Check Cache / Save Run"| DB
 
     %% Ingestion to Agents
-    RP -->|"Parsed Candidate Text"| REC
-    JDS -->|"Parsed Job Description"| REC
+    RP -->|"Raw Resume Text"| EXT
+    JDS -->|"Parsed Job Description"| OBS
+    JDS -.->|"Context for Scoring"| MAT
 
-    %% Evaluator-Optimizer Feedback Loop
-    REC -->|"Audit Verdict & Tier"| DEC
-    DEC -->|"Needs Revision"| REW
-    REW -->|"Tailored Bullets"| REC
+    %% Section-by-Section Orchestration Loop
+    EXT -->|"Parsed Sections"| OBS
+    OBS -->|"Directive & Action"| ACT
+    ACT -->|"REVISE / KEEP_AS_IS"| REW
+    ACT -->|"DROP"| ADV
+    REW --> MORE
+    ADV --> MORE
+    MORE -->|"Yes (Next Section)"| OBS
+    MORE -->|"No (All Sections Done)"| STI
 
-    %% Workflow Completion
-    DEC -->|"Yes (High / Perfect Match)"| REF
-    DEC -->|"Audit Complete"| OUT
-    REF -->|"Referral Message"| OUT
-    OUT -.->|"Persist File Path"| DB
+    %% Holistic Matching & Output Flow
+    STI -->|"Stitched Resume"| MAT
+    MAT -->|"Categorical Tier"| TIER
+    TIER -->|"Passing (High/Perfect)"| REF
+    TIER -->|"Review Complete"| SAVE
+    REF --> SAVE
+    SAVE --> OUT
+    OUT -.->|"Persist File Path & State"| DB
 
     %% LLM Invocations
-    REC <-.->|"Prompt & Evaluation"| OLLAMA
-    REW <-.->|"Prompt & Rewrites"| OLLAMA
-    REF <-.->|"Prompt & Outreach"| OLLAMA
+    EXT <-.->|"JSON Extraction"| OLLAMA
+    OBS <-.->|"Section Directives (1024-4096 tokens)"| OLLAMA
+    REW <-.->|"Bullet Rewrites & Word Limit"| OLLAMA
+    MAT <-.->|"Match Tier & Verdict"| OLLAMA
+    REF <-.->|"Outreach Draft"| OLLAMA
 ```
 
 ### Component Communication Breakdown
 
 - **User Interfaces (`run_cli.py` & `webapp/`)**: Accepts candidate resumes and job inputs (URL or raw text). Coordinates pre-flight health checks and performs instant cache lookups against PostgreSQL (`Company` + `Job ID`) to avoid redundant LLM invocations unless `--force` is specified.
 - **Ingestion & Parsing (`parsers/` & `scrapers/`)**: `ResumeParser` extracts normalized text from `.pdf`, `.md`, `.txt`, and `.docx` documents. `JDScraper` uses Crawl4AI (headless Chromium) with JSON-LD schema parsing and SPA delay handling to extract clean job postings from career sites or local files.
-- **LangGraph Multi-Agent Core (`agents/`)**: Manages the Evaluator-Optimizer feedback loop via `StateGraph`:
-  - **Recruiter Agent (Evaluator):** Deterministically (`temperature = 0`) compares candidate qualifications against JD requirements, producing structured gap analyses, strengths, and a categorical match tier.
-  - **Decision Router (`route_matcher_verdict`):** Evaluates if the match tier qualifies as passing (`High Match` or `Perfect Match`) to generate targeted referral outreach.
-  - **Re-writer Agent (Optimizer):** Takes recruiter feedback and a curated action verb taxonomy to rewrite bullets using active voice and metrics without fabricating facts (zero-hallucination constraint), then routes back to the Recruiter.
-  - **Referral Generator Agent:** When target qualification is reached, drafts an outreach message for LinkedIn or email.
+- **Decomposed LangGraph Multi-Agent Core (`agents/`)**: Manages the section-by-section Evaluator-Optimizer pipeline via `StateGraph`:
+  - **Extractor Agent (`extractor.py`):** Separates candidate header metadata and decomposes resume body into logical sections (`summary`, `experience`, `projects`, `skills`, `education`).
+  - **Recruiter-Observer Agent (`observer.py`):** Cold section auditor (`temperature = 0.0`) that outputs `DROP`, `KEEP_AS_IS`, or `REVISE` actions along with explicit directives. Features adaptive token budgeting (1024 $\to$ 2048 $\to$ 4096) on parser failures to handle reasoning models without output clipping.
+  - **Re-writer Agent (`rewriter.py`):** Optimizes bullets using categorized action verbs, Google XYZ metric structure, zero-hallucination constraints, and strictly enforces the pointer word limit (`WORD_LIMIT`). Pointers in `KEEP_AS_IS` sections are also audited for word limit and impact.
+  - **Section Advancement & Stitcher (`stitcher.py`):** Advances index, drops irrelevant sections, and stitches all finalized sections with candidate header into a complete Markdown document.
+  - **Recruiter-Matcher Agent (`matcher.py`):** Evaluates the final stitched resume against the JD, assigning a categorical match tier (`Irrelevant`, `Low Match`, `Average Match`, `High Match`, `Perfect Match`), strengths, gaps, and verdict.
+  - **Referral Generator Agent (`referral.py`):** When candidate achieves `High Match` or `Perfect Match`, crafts a tailored, professional reach-out message.
+  - **Artifact Saver (`save_artifacts_node`):** Exports the final Markdown resume to `output/` or `~/.resume-rewriter/output/` and records the final status (`MATCHED` or `REVIEW_COMPLETE`) in PostgreSQL.
 - **Storage & External Infrastructure**:
-  - **Ollama**: Provides private local inference for LLM prompts across all agent nodes.
+  - **Ollama**: Provides private local inference for LLM prompts across all agent nodes, supporting configurable reasoning mode (`OLLAMA_REASONING`).
   - **PostgreSQL**: Stores execution state, audit logs, and history for the web archive.
   - **Output Artifacts**: Saves the final optimized Markdown resume to `output/<Company>_<JobID>_resume.md` and user uploads to `~/.resume-rewriter/uploads/`.
 
@@ -103,7 +127,7 @@ flowchart TD
 | **Agent Framework** | LangGraph | `1.2.15` | StateGraph orchestrator & cyclic Evaluator-Optimizer loop |
 | **LLM Orchestration** | LangChain Core | `1.6.12` | Prompt templates, structured outputs, and chain execution |
 | **LLM Integration** | LangChain-Ollama | `1.1.0` | Integration layer between LangChain and local Ollama |
-| **Local LLM Engine** | Ollama | `0.40.5` | Local model inference hosting (`qwen2.5:7b` / `qwen2.5:14b`) |
+| **Local LLM Engine** | Ollama | `0.40.5` | Local model inference hosting (`qwen2.5:7b` / `qwen3:8b`) |
 | **Database** | PostgreSQL (`psql`) | `14.24` | Application state persistence, run history, and caching |
 | **Database Driver** | Psycopg 3 | `3.2.0+` | PostgreSQL database adapter for Python |
 | **Web Framework** | FastAPI | `0.143.3` | REST endpoints and Server-Sent Events (SSE) streaming |
@@ -154,22 +178,26 @@ resume_rewriter/
 ├── agents/
 │   ├── __init__.py
 │   ├── state.py                 # LangGraph AgentState TypedDict definition
-│   ├── recruiter.py             # Recruiter evaluator node (temperature = 0)
-│   ├── rewriter.py              # Resume optimizer node (action verbs injection)
-│   ├── referral.py              # Referral generator node
-│   └── workflow.py              # LangGraph StateGraph assembly and loop routing logic
+│   ├── extractor.py             # Header isolation and section decomposition node
+│   ├── observer.py              # Section recruiter evaluation node with adaptive token budgeting
+│   ├── rewriter.py              # Bullet optimizer node (action verbs, XYZ formula, word limit)
+│   ├── stitcher.py              # Section advancement, filtering, and final markdown assembly
+│   ├── matcher.py               # Holistic recruiter evaluation node (categorical match tiers)
+│   ├── referral.py              # Targeted referral reach-out generator node
+│   ├── recruiter.py             # Legacy monolithic recruiter node
+│   └── workflow.py              # LangGraph StateGraph assembly and conditional routing logic
 ├── webapp/                      # Web application backend and frontend assets
 │   ├── __init__.py
-│   ├── server.py                # FastAPI REST API and static file server
+│   ├── server.py                # FastAPI REST API, configuration endpoints, and static file server
 │   ├── pipeline_runner.py       # Background worker and Server-Sent Events (SSE) stream manager
 │   └── assets/                  # Frontend single-page app assets
-│       ├── html/index.html      # Responsive Dark Mode dashboard
+│       ├── html/index.html      # Responsive Dark Mode dashboard with System Configuration drawer
 │       ├── css/style.css        # Slate/cyan design system and glassmorphism styling
 │       └── js/app.js            # Independent tab logic, SSE stream consumer, and lazy loader
 ├── output/                      # Default destination for generated Markdown resumes
 ├── bootstrap.py                 # System health-check utility with intelligent localhost fallback
-├── run_gui.py                    # Root entry point to launch the interactive Web UI
-├── run_cli.py                      # Click-based CLI entry point
+├── run_gui.py                   # Root entry point to launch the interactive Web UI
+├── run_cli.py                   # Click-based CLI entry point
 ├── requirements.txt             # Project dependencies
 ├── .dockerignore                # Build context allowlist filter
 ├── .env.example                 # Template environment variables
@@ -177,15 +205,21 @@ resume_rewriter/
 ```
 
 ### Module Descriptions
-- **`config/settings.py`**: Centralizes configuration (database URLs, Ollama endpoint, default loop limits, and score thresholds) via `pydantic-settings`. Prioritizes user configuration in `~/.resume-rewriter/config.env` and supports hot-reloading.
-- **`db/`**: Handles database interactions. `schema.sql` manages table creation with columns for `source_resume_path` and `recruiter_verdict`. `operations.py` manages deduplication checks, cursor-based history pagination, and application state updates.
+- **`config/settings.py`**: Centralizes configuration (database credentials, Ollama endpoint, model tag, reasoning toggle, pointer word limits, and output directory) via `pydantic-settings`. Prioritizes user configuration in `~/.resume-rewriter/config.env` and supports hot-reloading.
+- **`config/action_verbs.py`**: Categorized dictionary of active industry verbs used by the Re-writer Agent to inject metric-driven impact.
+- **`db/`**: Handles database interactions. `schema.sql` manages table creation with columns for `match_tier`, `source_resume_path`, and `recruiter_verdict`. `operations.py` manages deduplication checks, cursor-based history pagination, and application state updates.
 - **`docker/`**: Contains containerization and deployment assets. `Dockerfile` packages the application on a slim Python 3.10 runtime with Playwright Chromium; `docker-compose.yml` orchestrates the web dashboard alongside a GPU-accelerated Ollama container; and `build.sh` automates image compilation.
 - **`parsers/`**: An extensible document extraction suite. `resume_parser.py` extracts text from `.pdf`, `.md`, and `.txt` files.
 - **`scrapers/jd_scraper.py`**: Robust crawler built on `Crawl4AI` (headless Chromium) and `BeautifulSoup`. Features automatic extraction of structured `JobPosting` schema (`application/ld+json`), SPA render delay support, and heuristic DOM fallback to handle modern ATS platforms (Workday, Phenom People, Greenhouse, Lever).
-- **`agents/`**: Contains the core intelligence:
-  - `state.py`: Defines the typed payload passed through the agent graph.
-  - `recruiter.py`, `rewriter.py`, `referral.py`: Individual nodes encapsulating prompts and structured outputs.
-  - `workflow.py`: The `StateGraph` that manages the Evaluator-Optimizer loop, early termination conditions, and file exports.
+- **`agents/`**: Contains the core decomposed intelligence:
+  - `state.py`: Defines the typed payload (`AgentState`) passed through the agent graph.
+  - `extractor.py`: Extracts contact header information and breaks raw resume text into distinct sections.
+  - `observer.py`: Evaluates section relevance and issues structured revision directives with adaptive token retry (1024 $\to$ 2048 $\to$ 4096 tokens).
+  - `rewriter.py`: Applies action verbs, XYZ metric framing, and enforces the pointer word limit.
+  - `stitcher.py`: Advances section pointers and stitches surviving sections back together.
+  - `matcher.py`: Grades the full stitched resume into categorical match tiers (`Irrelevant` through `Perfect Match`).
+  - `referral.py`: Crafts targeted LinkedIn/email outreach drafts.
+  - `workflow.py`: Compiles the `StateGraph` that manages section looping, conditional branching, and file export.
 - **`webapp/`**: Encapsulates the Web UI server and frontend. `server.py` provides REST and SSE streaming endpoints; `pipeline_runner.py` decouples LLM execution into non-blocking background tasks; `assets/` contains the vanilla HTML, CSS, and JS.
 - **`run_gui.py`**: The clean root launcher to start the Web UI dashboard on `http://localhost:8000`.
 - **`bootstrap.py`**: Validates that external dependencies (PostgreSQL and Ollama) are online and configured before agent execution starts, with automatic fallback resolution between `host.docker.internal` and `localhost`.
@@ -304,12 +338,6 @@ Edit `.env` to match your environment:
 # Ollama Configuration
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_MODEL=qwen2.5:7b
-
-# PostgreSQL Database Configuration
-POSTGRES_HOST=localhost
-# Ollama Configuration
-OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=qwen2.5:7b
 OLLAMA_REASONING=false
 
 # PostgreSQL Database Configuration
@@ -319,17 +347,17 @@ POSTGRES_DB=resume_rewriter_db
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=postgres
 
-# Content Constraints
-WORD_LIMIT=30
+# Content & Rewriter Constraints
+WORD_LIMIT=20
 ```
 
 | Variable | Description |
 | :--- | :--- |
-| `OLLAMA_BASE_URL` | Endpoint of the Ollama server (native or container). |
+| `OLLAMA_BASE_URL` | Endpoint of the Ollama server (native or container). Default: `http://localhost:11434`. |
 | `OLLAMA_MODEL` | Local LLM tag (e.g., `qwen2.5:7b`, `qwen3:8b`). |
-| `OLLAMA_REASONING` | Toggle thinking/reasoning mode for reasoning models (e.g., Qwen 3). |
+| `OLLAMA_REASONING` | Toggle thinking/reasoning mode for reasoning models (e.g., Qwen 3). Default: `false`. Can also be set via `REASONING`. |
 | `POSTGRES_*` | Connection credentials for the application database. |
-| `WORD_LIMIT` | Maximum word count per pointer in the rewritten resume. |
+| `WORD_LIMIT` | Maximum word count per pointer in the rewritten resume. Default: `20`. |
 
 ---
 
@@ -392,39 +420,35 @@ If any system is unreachable or uninitialized, the diagnostic table will highlig
 #### Command Line Options
 ```text
 Options:
-  -r, --resume PATH        Path to base candidate resume (.pdf, .md, .txt, or
-                           .docx).  [required]
-  -c, --company TEXT       Name of the hiring company (e.g., 'Stripe').
-                           [required]
-  -j, --job-id TEXT        Unique requisition ID or code (e.g., 'ENG-4021').
-                           [required]
-  --role TEXT              Target job title (e.g., 'Senior Backend Engineer').
-                           [required]
-  -u, --url TEXT           Public URL to the job posting (scraped via
-                           Crawl4AI).
-  --jd-file PATH           Local path to a text/markdown file containing the
-                           JD.
-  -f, --force              Force re-execution even if the job posting was
-                           already processed in the database.
+  -r, --resume PATH               Path to base candidate resume (.pdf, .md,
+                                  .txt, or .docx).  [required]
+  -c, --company TEXT              Name of the hiring company (e.g.,
+                                  'Mastercard').  [required]
+  -j, --job-id TEXT               Unique requisition ID or code (e.g.,
+                                  'MAS-101').  [required]
+  --role TEXT                     Target job title (e.g., 'Senior AI
+                                  Engineer').  [required]
+  -u, --url TEXT                  Public URL to the job posting (scraped via
+                                  Crawl4AI).
+  --jd-file PATH                  Local path to a text/markdown file
+                                  containing the JD.
+  -f, --force                     Force re-execution even if the job posting
+                                  was already processed in the database.
+  -i, --instructions TEXT         General auxiliary instructions for all
+                                  agents (text string or path to a .txt file).
+  --recruiter-instructions, --recruiter-inst TEXT
+                                  Specific guidance for Recruiter-Observer and
+                                  Matcher agents (text string or file path).
+  --rewriter-instructions, --rewriter-inst TEXT
+                                  Specific guidance for Section Re-writer
+                                  agent (text string or file path).
+  --referral-instructions, --referral-inst TEXT
+                                  Specific guidance for Referral agent (text
+                                  string or file path).
   -w, --word-limit INTEGER        Maximum word limit per pointer in the resume
                                   (overrides WORD_LIMIT env setting).
-  --skip-bootstrap         Skip pre-flight health checks for Ollama and
-                           PostgreSQL.
-  -i, --instructions TEXT         General auxiliary instructions applied
-                                  across all agents (accepts a string or path
-                                  to a .txt file).
-  --recruiter-instructions, --recruiter-inst TEXT
-                                  Auxiliary instructions specifically for the
-                                  Recruiter agent (accepts a string or path to
-                                  a .txt file).
-  --rewriter-instructions, --rewriter-inst TEXT
-                                  Auxiliary instructions specifically for the
-                                  Re-writer agent (accepts a string or path to
-                                  a .txt file).
-  --referral-instructions, --referral-inst TEXT
-                                  Auxiliary instructions specifically for the
-                                  Referral agent (accepts a string or path to
-                                  a .txt file).
+  --skip-bootstrap                Skip pre-flight health checks for Ollama and
+                                  PostgreSQL.
   --help                          Show this message and exit.
 ```
 
@@ -441,7 +465,7 @@ python run_cli.py \
   --role "Senior Backend Engineer" \
   --url "https://careers.datadog.com/detail/12345"
 ```
-*The scraper launches a headless Chromium instance, strips web noise, passes the text to the Recruiter Agent, runs the rewrite loop, and saves the Markdown resume under `output/`.*
+*The scraper launches a headless Chromium instance, strips web noise, isolates the candidate header, decomposes the resume into logical sections, audits and rewrites bullet points section-by-section adhering to word limits, stitches the complete resume, evaluates overall match tier, and saves the Markdown resume under `output/`.*
 
 #### Scenario B: Using a Local Job Description File
 Useful when applying to private job portals or internal transfers:
@@ -452,7 +476,7 @@ python run_cli.py \
   --job-id "REQ-9920" \
   --role "Staff Infrastructure Engineer" \
   --jd-file "data/stripe_jd.txt" \
-  --word-limit 25
+  --word-limit 20
 ```
 
 #### Scenario C: Idempotency Caching & Overriding (`--force`)
@@ -487,7 +511,8 @@ python run_cli.py \
   --url "https://careers.adobe.com/us/en/job/ADOBUSR171487EXTERNALENUS/Machine-Learning-Engineer-3" \
   --recruiter-instructions "Treat abstract ML systems background as transferable to generative AI pipelines; calibrate for Staff-level depth." \
   --rewriter-instructions "Emphasize PyTorch distributed training and inference latency metrics; maintain concise XYZ bullet points." \
-  --referral-instructions "Keep note under 70 words; mention shared enthusiasm for Adobe Firefly."
+  --referral-instructions "Keep note under 70 words; mention shared enthusiasm for Adobe Firefly." \
+  --word-limit 25
 ```
 
 ---
@@ -499,8 +524,9 @@ Upon completion of a successful run:
    ```text
    output/<Company>_<JobID>_resume.md
    ```
-2. **Referral Message**: If the match threshold was met, a customized reach-out message is printed directly to the terminal for easy copying.
-3. **Database Record**: All execution details (match score, final status, file paths, and referral messages) are updated in the `job_applications` PostgreSQL table.
+   *(or at `~/.resume-rewriter/output/<Company>_<JobID>_resume.md`)*
+2. **Referral Message**: If the match tier reaches `High Match` or `Perfect Match`, a customized reach-out message is printed directly to the terminal for easy copying.
+3. **Database Record**: All execution details (categorical `match_tier`, `recruiter_verdict`, `status` (`MATCHED` or `REVIEW_COMPLETE`), file paths, and referral messages) are updated in the `job_applications` PostgreSQL table.
 
 ---
 
@@ -518,16 +544,24 @@ Open **[http://localhost:8000](http://localhost:8000)** in your browser.
   * Drag & drop candidate base resume (`.pdf`, `.md`, `.txt`, `.docx`) — automatically saved to `~/.resume-rewriter/uploads/` for side-by-side version comparison.
   * Enter Target Company, Requisition ID, and Target Role.
   * Ingest Job Description via **URL Web Scrape** (Crawl4AI with JSON-LD schema parsing and SPA render delays) or **Direct Text / Paste**.
-  * **Agent Guidance & Instructions (Optional):** Interactive segmented selector allowing agent-specific guidance (Recruiter, Re-writer, Referral) as well as general fallback instructions. Any provided auxiliary prompt takes highest priority during agent execution. Indicator dots highlight configured tabs.
-  * Real-time Server-Sent Events (SSE) stepper reflecting each stage of the LangGraph agent pipeline: Pre-flight Bootstrap, Cache Verification, Content Ingestion, Recruiter Audit rounds (with Match Tier badge, strengths, gaps, and verdict), Re-writer Optimization passes, Referral Outreach, and Artifact saving.
+  * **Agent Guidance & Instructions (Optional):** Interactive segmented selector allowing agent-specific guidance (Recruiter-Observer / Matcher, Re-writer, Referral) as well as general fallback instructions. Any provided auxiliary prompt takes highest priority during agent execution. Indicator dots highlight configured tabs.
+  * **Live Stepper & Status (SSE):** Real-time Server-Sent Events stream reflecting each decomposed pipeline stage:
+    1. *Bootstrap Health Checks & Cache Verification*
+    2. *Extraction & Section Splitting*
+    3. *Recruiter-Observer Section Audits (with adaptive token budgeting)*
+    4. *Re-writer Bullet Optimization (action verbs, XYZ formula, word limit enforcement, KEEP_AS_IS impact audits)*
+    5. *Section Stitching & Document Reassembly*
+    6. *Recruiter-Matcher Holistic Evaluation (Categorical Match Tier, Strengths, Gaps, Verdict)*
+    7. *Referral Outreach Generation (for passing tiers)*
+    8. *Artifact Saving & Database State Persistence*
 * **Tab 2: History (Interactive Run Archive):**
   * **Fully Independent:** Switching between tabs does not disrupt an ongoing generation task.
   * **Lazy Loading:** Automatically fetches past applications sorted newest-first in batches of 15 records as you scroll.
   * **Search Bar:** Instantly filter runs by Company, Role, or Requisition ID.
-  * **Inspection Modal:** Click any card to review full Job Details, the Recruiter Audit Verdict, and the drafted Referral Message (with 1-click clipboard copy).
+  * **Inspection Modal:** Click any card to review full Job Details, the Categorical Match Tier badge (`Irrelevant`, `Low Match`, `Average Match`, `High Match`, `Perfect Match`), the Recruiter Audit Verdict, and the drafted Referral Message (with 1-click clipboard copy).
   * **Document Viewer:** Switch between **Rewritten Resume**, **Original Upload**, and a **Side-by-Side Comparison Diff** with full Markdown syntax highlighting and PDF preview.
 * **System Settings Drawer (Top-Right Gear Icon):**
-  * Edit Ollama host/model, PostgreSQL credentials, and pipeline parameters directly from the browser.
+  * Edit Ollama host/model, Model Reasoning mode (`OLLAMA_REASONING`), Re-writer Word Limit (`WORD_LIMIT`), and PostgreSQL credentials directly from the browser.
   * Persisted to `~/.resume-rewriter/config.env` and reused across all runs without needing to touch project files or restart the server.
   * **Test Connections:** Live connectivity validator for PostgreSQL and Ollama with status indicators.
 
@@ -549,3 +583,20 @@ Open **[http://localhost:8000](http://localhost:8000)** in your browser.
 * If an application was already evaluated for a given Company and Job ID, the system caches the result to avoid redundant compute.
 * In the CLI: Add the `--force` / `-f` flag.
 * In the Web UI: Expand the **Advanced Run Configuration** accordion and check **Force re-execution if cached**.
+
+### 8.4. Playwright Headless Chromium Missing
+* If scraping fails with `BrowserType.launch: Executable doesn't exist`, install the required headless browser binaries within your active environment:
+  ```bash
+  playwright install chromium
+  ```
+
+### 8.5. Crawl4AI Cache "attempt to write a readonly database"
+* If switching between Docker (which runs as root) and local virtual environments, Crawl4AI cache directories under `~/.resume-rewriter/.crawl4ai` may inherit root permissions. Fix ownership with:
+  ```bash
+  sudo chown -R $USER:$USER ~/.resume-rewriter
+  ```
+
+### 8.6. Reasoning Models & Token Exhaustion
+* When using reasoning models (such as `qwen3:8b`), model thinking tokens in `<think>...</think>` can consume the output budget before JSON formatting begins, leading to `OutputParserException` or empty JSON strings.
+* **Recommended Resolution:** In the Web UI System Settings drawer or `.env`, set `OLLAMA_REASONING=false` to disable thinking tokens for fast, deterministic, and direct JSON parsing.
+* **Adaptive Token Budgeting:** If reasoning is enabled, the Recruiter-Observer agent automatically handles parser exceptions by doubling the token prediction limit across retry attempts (`num_predict`: 1024 → 2048 → 4096 tokens).
