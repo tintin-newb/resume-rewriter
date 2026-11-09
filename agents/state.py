@@ -25,6 +25,7 @@ class AgentState(TypedDict):
     current_section_idx: int                  # Index pointer for section iteration
     processed_sections: List[Dict[str, Any]]  # Surviving sections after Observer & Rewriter
     final_resume: str                         # Final stitched Markdown document
+    word_limit: Optional[int]                 # Word limit per pointer / bullet in resume
 
     # Recruiter-Observer Outputs (Current Section)
     observer_action: Optional[str]            # "DROP" | "KEEP_AS_IS" | "REVISE"

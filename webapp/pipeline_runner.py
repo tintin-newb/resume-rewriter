@@ -207,6 +207,8 @@ async def run_pipeline_job(task: PipelineTask):
         recruiter_instructions = (task.payload.get("recruiter_instructions") or "").strip()
         rewriter_instructions = (task.payload.get("rewriter_instructions") or "").strip()
         referral_instructions = (task.payload.get("referral_instructions") or "").strip()
+        word_limit_param = task.payload.get("word_limit")
+        active_word_limit = int(word_limit_param) if word_limit_param is not None else settings.WORD_LIMIT
 
         initial_state: AgentState = {
             "company": company,
@@ -224,6 +226,7 @@ async def run_pipeline_job(task: PipelineTask):
             "current_section_idx": 0,
             "processed_sections": [],
             "final_resume": "",
+            "word_limit": active_word_limit,
             "observer_action": None,
             "section_directives": [],
             "match_tier": "Pending",

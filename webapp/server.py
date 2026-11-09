@@ -73,6 +73,7 @@ async def root():
 class ConfigUpdateRequest(BaseModel):
     OLLAMA_BASE_URL: Optional[str] = None
     OLLAMA_MODEL: Optional[str] = None
+    OLLAMA_REASONING: Optional[bool] = None
     REWRITER_TEMP: Optional[float] = None
     REFERRAL_TEMP: Optional[float] = None
     RECRUITER_TEMP: Optional[float] = None
@@ -81,7 +82,7 @@ class ConfigUpdateRequest(BaseModel):
     POSTGRES_DB: Optional[str] = None
     POSTGRES_USER: Optional[str] = None
     POSTGRES_PASSWORD: Optional[str] = None
-    MAX_LOOPS: Optional[int] = None
+    WORD_LIMIT: Optional[int] = None
 
 
 @app.get("/api/config")
@@ -92,6 +93,7 @@ async def get_config():
         "settings": {
             "OLLAMA_BASE_URL": settings.OLLAMA_BASE_URL,
             "OLLAMA_MODEL": settings.OLLAMA_MODEL,
+            "OLLAMA_REASONING": settings.reasoning,
             "REWRITER_TEMP": settings.REWRITER_TEMP,
             "REFERRAL_TEMP": settings.REFERRAL_TEMP,
             "RECRUITER_TEMP": settings.RECRUITER_TEMP,
@@ -100,7 +102,7 @@ async def get_config():
             "POSTGRES_DB": settings.POSTGRES_DB,
             "POSTGRES_USER": settings.POSTGRES_USER,
             "POSTGRES_PASSWORD": settings.POSTGRES_PASSWORD,
-            "MAX_LOOPS": settings.MAX_LOOPS,
+            "WORD_LIMIT": settings.WORD_LIMIT,
             "OUTPUT_DIR": str(settings.OUTPUT_DIR),
             "UPLOADS_DIR": str(APP_UPLOADS_DIR)
         }
@@ -121,6 +123,7 @@ async def update_config(req: ConfigUpdateRequest):
         "settings": {
             "OLLAMA_BASE_URL": settings.OLLAMA_BASE_URL,
             "OLLAMA_MODEL": settings.OLLAMA_MODEL,
+            "OLLAMA_REASONING": settings.reasoning,
             "REWRITER_TEMP": settings.REWRITER_TEMP,
             "REFERRAL_TEMP": settings.REFERRAL_TEMP,
             "RECRUITER_TEMP": settings.RECRUITER_TEMP,
@@ -128,7 +131,7 @@ async def update_config(req: ConfigUpdateRequest):
             "POSTGRES_PORT": settings.POSTGRES_PORT,
             "POSTGRES_DB": settings.POSTGRES_DB,
             "POSTGRES_USER": settings.POSTGRES_USER,
-            "MAX_LOOPS": settings.MAX_LOOPS,
+            "WORD_LIMIT": settings.WORD_LIMIT,
         }
     }
 
@@ -169,7 +172,7 @@ async def start_generation(
     referral_instructions: Optional[str] = Form(None),
     force: bool = Form(False),
     min_score: Optional[float] = Form(None),
-    max_loops: Optional[int] = Form(None),
+    word_limit: Optional[int] = Form(None),
     skip_bootstrap: bool = Form(False)
 ):
     if not company.strip() or not job_id.strip() or not role.strip():
@@ -202,7 +205,7 @@ async def start_generation(
         "referral_instructions": referral_instructions.strip() if referral_instructions else None,
         "force": force,
         "min_score": min_score,
-        "max_loops": max_loops,
+        "word_limit": word_limit,
         "skip_bootstrap": skip_bootstrap,
         "source_resume_path": str(dest_path.resolve())
     }

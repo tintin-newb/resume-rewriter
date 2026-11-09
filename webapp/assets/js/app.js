@@ -177,7 +177,6 @@ async function handleGenerateSubmit(e) {
   const referralInst = document.getElementById('input-aux-referral')?.value.trim() || '';
   const generalInst = (document.getElementById('input-aux-general')?.value || document.getElementById('input-auxiliary-instructions')?.value || '').trim();
 
-  const maxLoops = document.getElementById('input-max-loops')?.value;
   const force = document.getElementById('check-force').checked;
   const skipBootstrap = document.getElementById('check-skip-bootstrap').checked;
 
@@ -201,7 +200,6 @@ async function handleGenerateSubmit(e) {
   if (rewriterInst) formData.append('rewriter_instructions', rewriterInst);
   if (referralInst) formData.append('referral_instructions', referralInst);
   if (generalInst) formData.append('auxiliary_instructions', generalInst);
-  if (maxLoops) formData.append('max_loops', maxLoops);
   formData.append('force', force);
   formData.append('skip_bootstrap', skipBootstrap);
 
@@ -910,12 +908,15 @@ async function loadConfig() {
     document.getElementById('settings-file-badge').textContent = data.env_file_path || '~/.resume-rewriter/config.env';
     document.getElementById('cfg-ollama-url').value = s.OLLAMA_BASE_URL || '';
     document.getElementById('cfg-ollama-model').value = s.OLLAMA_MODEL || '';
+    const reasoningCheckbox = document.getElementById('cfg-ollama-reasoning');
+    if (reasoningCheckbox) reasoningCheckbox.checked = Boolean(s.OLLAMA_REASONING);
     document.getElementById('cfg-pg-host').value = s.POSTGRES_HOST || '';
     document.getElementById('cfg-pg-port').value = s.POSTGRES_PORT || 5432;
     document.getElementById('cfg-pg-db').value = s.POSTGRES_DB || '';
     document.getElementById('cfg-pg-user').value = s.POSTGRES_USER || '';
     document.getElementById('cfg-pg-pass').value = s.POSTGRES_PASSWORD || '';
-    document.getElementById('cfg-max-loops').value = s.MAX_LOOPS || 3;
+    const wordLimitInput = document.getElementById('cfg-word-limit');
+    if (wordLimitInput) wordLimitInput.value = s.WORD_LIMIT || 30;
     document.getElementById('cfg-rewriter-temp').value = s.REWRITER_TEMP !== undefined ? s.REWRITER_TEMP : 0.1;
     document.getElementById('cfg-recruiter-temp').value = s.RECRUITER_TEMP !== undefined ? s.RECRUITER_TEMP : 0.0;
     const refTempInput = document.getElementById('cfg-referral-temp');
@@ -930,12 +931,13 @@ async function saveSystemConfig() {
   const payload = {
     OLLAMA_BASE_URL: document.getElementById('cfg-ollama-url').value.trim(),
     OLLAMA_MODEL: document.getElementById('cfg-ollama-model').value.trim(),
+    OLLAMA_REASONING: document.getElementById('cfg-ollama-reasoning')?.checked ?? false,
     POSTGRES_HOST: document.getElementById('cfg-pg-host').value.trim(),
     POSTGRES_PORT: parseInt(document.getElementById('cfg-pg-port').value) || 5432,
     POSTGRES_DB: document.getElementById('cfg-pg-db').value.trim(),
     POSTGRES_USER: document.getElementById('cfg-pg-user').value.trim(),
     POSTGRES_PASSWORD: document.getElementById('cfg-pg-pass').value,
-    MAX_LOOPS: parseInt(document.getElementById('cfg-max-loops')?.value) || 3,
+    WORD_LIMIT: parseInt(document.getElementById('cfg-word-limit')?.value) || 30,
     REWRITER_TEMP: parseFloat(document.getElementById('cfg-rewriter-temp').value) || 0.1,
     RECRUITER_TEMP: parseFloat(document.getElementById('cfg-recruiter-temp').value) || 0.0,
     REFERRAL_TEMP: parseFloat(document.getElementById('cfg-referral-temp')?.value) || 0.2,
@@ -966,6 +968,7 @@ async function testSystemConnections() {
   const payload = {
     OLLAMA_BASE_URL: document.getElementById('cfg-ollama-url').value.trim(),
     OLLAMA_MODEL: document.getElementById('cfg-ollama-model').value.trim(),
+    OLLAMA_REASONING: document.getElementById('cfg-ollama-reasoning')?.checked ?? false,
     POSTGRES_HOST: document.getElementById('cfg-pg-host').value.trim(),
     POSTGRES_PORT: parseInt(document.getElementById('cfg-pg-port').value) || 5432,
     POSTGRES_DB: document.getElementById('cfg-pg-db').value.trim(),

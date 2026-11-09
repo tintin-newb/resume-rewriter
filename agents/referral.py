@@ -67,7 +67,8 @@ def referral_node(state: AgentState) -> Dict[str, Any]:
         base_url=settings.OLLAMA_BASE_URL,
         temperature=settings.REFERRAL_TEMP,
         num_ctx=4096,
-        num_predict=1024
+        num_predict=1024,
+        reasoning=settings.reasoning,
     ).with_structured_output(ReferralResult)
 
     strengths_list = state.get("strengths") or []

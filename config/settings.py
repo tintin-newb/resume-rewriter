@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 APP_HOME_DIR: Path = Path.home() / ".resume-rewriter"
@@ -68,6 +68,8 @@ class Settings(BaseSettings):
     # Ollama
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "qwen2.5:7b"
+    OLLAMA_REASONING: bool = False
+    REASONING: Optional[bool] = None
     REWRITER_TEMP: float = 0.2
     REFERRAL_TEMP: float = 0.2
     RECRUITER_TEMP: float = 0.0
@@ -79,8 +81,8 @@ class Settings(BaseSettings):
     POSTGRES_USER: str = "postgres"
     POSTGRES_PASSWORD: str = ""
 
-    # Pipeline Settings
-    MAX_LOOPS: int = 3
+    # Pipeline & Content Settings
+    WORD_LIMIT: int = 20
     OUTPUT_DIR: Path = APP_OUTPUT_DIR
 
     model_config = SettingsConfigDict(
@@ -88,6 +90,12 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore"
     )
+
+    @property
+    def reasoning(self) -> bool:
+        if self.REASONING is not None:
+            return self.REASONING
+        return self.OLLAMA_REASONING
 
     @property
     def postgres_dsn(self) -> str:

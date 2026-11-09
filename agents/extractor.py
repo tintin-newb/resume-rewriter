@@ -85,6 +85,7 @@ def extractor_node(state: AgentState) -> Dict[str, Any]:
         temperature=0.0,
         num_ctx=8192,
         num_predict=4096,
+        reasoning=settings.reasoning,
     ).with_structured_output(ExtractedResume)
 
     prompt = ChatPromptTemplate.from_messages([

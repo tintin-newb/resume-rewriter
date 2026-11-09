@@ -1,11 +1,16 @@
 # agents/observer.py
+import json
 from enum import Enum
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 from langchain_ollama import ChatOllama
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.exceptions import OutputParserException
+from rich.console import Console
 from config.settings import settings
 from agents.state import AgentState
+
+console = Console()
 
 
 class SectionAction(str, Enum):
@@ -37,7 +42,7 @@ class SectionAuditVerdict(BaseModel):
     )
 
 
-OBSERVER_SYSTEM_PROMPT = """You are an elite Principal Technical Recruiter conducting a section-by-section audit of a resume for a specific Job Description (JD).
+OBSERVER_SYSTEM_PROMPT = """You are a strict recruiting manager conducting a section-by-section audit of a resume for a specific Job Description (JD).
 You are evaluating ONLY ONE specific section of the resume right now.
 
 YOUR DECISION FRAMEWORK:
@@ -82,21 +87,13 @@ def observer_node(state: AgentState) -> Dict[str, Any]:
     """
     Audits the current section pointed to by state['current_section_idx'].
     Decides whether to DROP, KEEP_AS_IS, or REVISE the section.
+    Uses adaptive num_predict (1024 -> 2048 -> 4096) across 2 re-attempts
+    if output parsing fails.
     """
-    llm = ChatOllama(
-        model=settings.OLLAMA_MODEL,
-        base_url=settings.OLLAMA_BASE_URL,
-        temperature=0.0,
-        num_ctx=4096,
-        num_predict=1024,
-    ).with_structured_output(SectionAuditVerdict)
-
     prompt = ChatPromptTemplate.from_messages([
         ("system", OBSERVER_SYSTEM_PROMPT),
         ("user", OBSERVER_USER_PROMPT),
     ])
-
-    chain = prompt | llm
 
     current_idx = state.get("current_section_idx", 0)
     sections = state.get("parsed_sections", [])
@@ -122,13 +119,54 @@ def observer_node(state: AgentState) -> Dict[str, Any]:
     else:
         aux_text = "None provided. Apply standard strict 6-second scan pruning."
 
-    verdict: SectionAuditVerdict = chain.invoke({
-        "job_description": state["job_description"],
-        "section_title": target_section.get("title", ""),
-        "section_type": target_section.get("section_type", "other"),
-        "section_content": target_section.get("content", ""),
-        "auxiliary_instructions": aux_text,
-    })
+    predict_sequence = [1024, 2048, 4096]
+    verdict: Optional[SectionAuditVerdict] = None
+    last_exception: Optional[Exception] = None
+
+    for attempt, predict_tokens in enumerate(predict_sequence):
+        num_ctx = max(4096, predict_tokens * 2)
+        llm = ChatOllama(
+            model=settings.OLLAMA_MODEL,
+            base_url=settings.OLLAMA_BASE_URL,
+            temperature=0.0,
+            num_ctx=num_ctx,
+            num_predict=predict_tokens,
+            reasoning=settings.reasoning,
+        ).with_structured_output(SectionAuditVerdict)
+
+        chain = prompt | llm
+
+        try:
+            verdict = chain.invoke({
+                "job_description": state["job_description"],
+                "section_title": target_section.get("title", ""),
+                "section_type": target_section.get("section_type", "other"),
+                "section_content": target_section.get("content", ""),
+                "auxiliary_instructions": aux_text,
+            })
+            if verdict is not None:
+                break
+        except (OutputParserException, json.JSONDecodeError, ValueError) as exc:
+            last_exception = exc
+            if attempt < len(predict_sequence) - 1:
+                next_tokens = predict_sequence[attempt + 1]
+                console.print(
+                    f"  [yellow]⚠ Observer parsing failed at num_predict={predict_tokens} on '{target_section.get('title', 'section')}'. "
+                    f"Doubling to num_predict={next_tokens} (re-attempt {attempt + 1}/2)...[/yellow]"
+                )
+            else:
+                console.print(
+                    f"  [red]✗ All 2 re-attempts failed up to num_predict={predict_tokens} on '{target_section.get('title', 'section')}'.[/red]"
+                )
+                raise last_exception
+
+    if verdict is None:
+        if last_exception is not None:
+            raise last_exception
+        return {
+            "observer_action": "KEEP_AS_IS",
+            "section_directives": []
+        }
 
     # Assemble concrete directives for this section
     directives: List[str] = []
@@ -139,6 +177,11 @@ def observer_node(state: AgentState) -> Dict[str, Any]:
             directives.append("REORDER BULLETS:\n" + "\n".join(f"  - [MOVE TO TOP]: {r}" for r in verdict.reorder_priorities))
         if verdict.rewording_directives:
             directives.append("REWORDING:\n" + "\n".join(f"  - {w}" for w in verdict.rewording_directives))
+    elif verdict.action == SectionAction.KEEP_AS_IS:
+        directives.append("SECTION ACTION: KEEP_AS_IS")
+        if verdict.reasoning:
+            directives.append(f"REASONING: {verdict.reasoning}")
+        directives.append("INSPECTION DIRECTIVE: Verify all pointers against the word limit constraint. Rephrase any pointer that exceeds the word limit or can be made more impactful while preserving factual fidelity.")
 
     return {
         "observer_action": verdict.action.value,
