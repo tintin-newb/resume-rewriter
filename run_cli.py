@@ -284,7 +284,7 @@ def run_cli(
                 
                 action_notes = {
                     "DROP": "[dim](purged low-signal / non-technical)[/dim]",
-                    "KEEP_AS_IS": "[dim](preserved verbatim)[/dim]",
+                    "KEEP_AS_IS": "[dim](word limit & impact verified by rewriter)[/dim]",
                     "REVISE": "[dim](optimization directives generated)[/dim]"
                 }
                 note = action_notes.get(action, "")

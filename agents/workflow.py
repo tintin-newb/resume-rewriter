@@ -34,11 +34,15 @@ def save_artifacts_node(state: AgentState) -> Dict[str, Any]:
 
 
 def route_section_action(state: AgentState) -> Literal["rewriter", "advance_section"]:
-    """Routes based on the Recruiter-Observer's section verdict."""
+    """
+    Routes based on the Recruiter-Observer's section verdict:
+    - DROP: advances section to discard it.
+    - REVISE or KEEP_AS_IS: routes to rewriter to optimize bullets or enforce word limit/impact.
+    """
     action = state.get("observer_action", "KEEP_AS_IS")
-    if action == "REVISE":
-        return "rewriter"
-    return "advance_section"
+    if action == "DROP":
+        return "advance_section"
+    return "rewriter"
 
 
 def route_section_loop(state: AgentState) -> Literal["observer", "stitcher"]:

@@ -177,6 +177,11 @@ def observer_node(state: AgentState) -> Dict[str, Any]:
             directives.append("REORDER BULLETS:\n" + "\n".join(f"  - [MOVE TO TOP]: {r}" for r in verdict.reorder_priorities))
         if verdict.rewording_directives:
             directives.append("REWORDING:\n" + "\n".join(f"  - {w}" for w in verdict.rewording_directives))
+    elif verdict.action == SectionAction.KEEP_AS_IS:
+        directives.append("SECTION ACTION: KEEP_AS_IS")
+        if verdict.reasoning:
+            directives.append(f"REASONING: {verdict.reasoning}")
+        directives.append("INSPECTION DIRECTIVE: Verify all pointers against the word limit constraint. Rephrase any pointer that exceeds the word limit or can be made more impactful while preserving factual fidelity.")
 
     return {
         "observer_action": verdict.action.value,
