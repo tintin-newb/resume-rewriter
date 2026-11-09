@@ -307,6 +307,13 @@ OLLAMA_MODEL=qwen2.5:7b
 
 # PostgreSQL Database Configuration
 POSTGRES_HOST=localhost
+# Ollama Configuration
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=qwen2.5:7b
+OLLAMA_REASONING=false
+
+# PostgreSQL Database Configuration
+POSTGRES_HOST=localhost
 POSTGRES_PORT=5432
 POSTGRES_DB=resume_rewriter_db
 POSTGRES_USER=postgres
@@ -319,7 +326,8 @@ WORD_LIMIT=30
 | Variable | Description |
 | :--- | :--- |
 | `OLLAMA_BASE_URL` | Endpoint of the Ollama server (native or container). |
-| `OLLAMA_MODEL` | Local LLM tag (e.g., `qwen2.5:7b`, `qwen2.5:14b`). |
+| `OLLAMA_MODEL` | Local LLM tag (e.g., `qwen2.5:7b`, `qwen3:8b`). |
+| `OLLAMA_REASONING` | Toggle thinking/reasoning mode for reasoning models (e.g., Qwen 3). |
 | `POSTGRES_*` | Connection credentials for the application database. |
 | `WORD_LIMIT` | Maximum word count per pointer in the rewritten resume. |
 

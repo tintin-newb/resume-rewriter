@@ -73,6 +73,7 @@ async def root():
 class ConfigUpdateRequest(BaseModel):
     OLLAMA_BASE_URL: Optional[str] = None
     OLLAMA_MODEL: Optional[str] = None
+    OLLAMA_REASONING: Optional[bool] = None
     REWRITER_TEMP: Optional[float] = None
     REFERRAL_TEMP: Optional[float] = None
     RECRUITER_TEMP: Optional[float] = None
@@ -92,6 +93,7 @@ async def get_config():
         "settings": {
             "OLLAMA_BASE_URL": settings.OLLAMA_BASE_URL,
             "OLLAMA_MODEL": settings.OLLAMA_MODEL,
+            "OLLAMA_REASONING": settings.reasoning,
             "REWRITER_TEMP": settings.REWRITER_TEMP,
             "REFERRAL_TEMP": settings.REFERRAL_TEMP,
             "RECRUITER_TEMP": settings.RECRUITER_TEMP,
@@ -121,6 +123,7 @@ async def update_config(req: ConfigUpdateRequest):
         "settings": {
             "OLLAMA_BASE_URL": settings.OLLAMA_BASE_URL,
             "OLLAMA_MODEL": settings.OLLAMA_MODEL,
+            "OLLAMA_REASONING": settings.reasoning,
             "REWRITER_TEMP": settings.REWRITER_TEMP,
             "REFERRAL_TEMP": settings.REFERRAL_TEMP,
             "RECRUITER_TEMP": settings.RECRUITER_TEMP,

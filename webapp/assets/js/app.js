@@ -908,6 +908,8 @@ async function loadConfig() {
     document.getElementById('settings-file-badge').textContent = data.env_file_path || '~/.resume-rewriter/config.env';
     document.getElementById('cfg-ollama-url').value = s.OLLAMA_BASE_URL || '';
     document.getElementById('cfg-ollama-model').value = s.OLLAMA_MODEL || '';
+    const reasoningCheckbox = document.getElementById('cfg-ollama-reasoning');
+    if (reasoningCheckbox) reasoningCheckbox.checked = Boolean(s.OLLAMA_REASONING);
     document.getElementById('cfg-pg-host').value = s.POSTGRES_HOST || '';
     document.getElementById('cfg-pg-port').value = s.POSTGRES_PORT || 5432;
     document.getElementById('cfg-pg-db').value = s.POSTGRES_DB || '';
@@ -929,6 +931,7 @@ async function saveSystemConfig() {
   const payload = {
     OLLAMA_BASE_URL: document.getElementById('cfg-ollama-url').value.trim(),
     OLLAMA_MODEL: document.getElementById('cfg-ollama-model').value.trim(),
+    OLLAMA_REASONING: document.getElementById('cfg-ollama-reasoning')?.checked ?? false,
     POSTGRES_HOST: document.getElementById('cfg-pg-host').value.trim(),
     POSTGRES_PORT: parseInt(document.getElementById('cfg-pg-port').value) || 5432,
     POSTGRES_DB: document.getElementById('cfg-pg-db').value.trim(),
@@ -965,6 +968,7 @@ async function testSystemConnections() {
   const payload = {
     OLLAMA_BASE_URL: document.getElementById('cfg-ollama-url').value.trim(),
     OLLAMA_MODEL: document.getElementById('cfg-ollama-model').value.trim(),
+    OLLAMA_REASONING: document.getElementById('cfg-ollama-reasoning')?.checked ?? false,
     POSTGRES_HOST: document.getElementById('cfg-pg-host').value.trim(),
     POSTGRES_PORT: parseInt(document.getElementById('cfg-pg-port').value) || 5432,
     POSTGRES_DB: document.getElementById('cfg-pg-db').value.trim(),

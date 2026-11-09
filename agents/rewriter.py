@@ -30,7 +30,7 @@ CRITICAL SECTION-LEVEL INSTRUCTIONS:
 4. WORD LIMIT PER POINTER (CONCISENESS CONSTRAINT):
    - Every individual bullet point or pointer MUST NOT exceed {word_limit} words.
    - Keep each pointer dense, high-impact, and strictly within this {word_limit}-word limit.
-   - Even in case of "KEEP_AS_IS" directive you MUST ensure the word limit constraint is satisfied. If not, reword the pointer 
+   - Even in case of "KEEP_AS_IS" directive you MUST ensure the word limit constraint is satisfied. If not, reword the pointer. 
 
 5. OUTPUT SPECIFICATION:
    - Output ONLY the clean Markdown content for this section.
@@ -70,6 +70,7 @@ def rewriter_node(state: AgentState) -> Dict[str, Any]:
         temperature=0.1,
         num_ctx=4096,
         num_predict=1536,
+        reasoning=settings.reasoning,
     )
 
     current_idx = state.get("current_section_idx", 0)
